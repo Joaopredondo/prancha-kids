@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Board } from './components/Board';
 import { CategoryTabs } from './components/CategoryTabs';
+import { Footer } from './components/Footer';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
 import { desbloquearAudio, prepararSons, tocarCard } from './audio/player';
@@ -69,6 +70,8 @@ export default function App() {
       <main className="flex-1">
         <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
       </main>
+
+      <Footer />
 
       <SettingsSheet
         aberto={configAberta}
