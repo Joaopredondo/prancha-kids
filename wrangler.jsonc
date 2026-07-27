@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prancha-kids",
+  "compatibility_date": "2026-07-01",
+  // Site estático puro: o Worker só serve os arquivos de dist/.
+  "assets": {
+    "directory": "./dist",
+    // Arquivo inexistente devolve 404 de verdade (não devolve index.html),
+    // senão o navegador tentaria decodificar HTML como MP3 ou WebP.
+    "not_found_handling": "404-page"
+  }
+}
