@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import logo from './assets/ipi.png';
 import { Board } from './components/Board';
 import { CategoryTabs } from './components/CategoryTabs';
 import { Footer } from './components/Footer';
@@ -48,7 +49,12 @@ export default function App() {
     >
       <header className="flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
         <h1 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
-          <span aria-hidden="true">⛪</span>
+          <img
+            src={logo}
+            alt=""
+            aria-hidden="true"
+            className="size-9 shrink-0 rounded-xl sm:size-10"
+          />
           Prancha Kids
         </h1>
         <button
