@@ -7,6 +7,7 @@ import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
 import { desbloquearAudio, prepararSons, tocarCard } from './audio/player';
 import { usePrefs } from './hooks/usePrefs';
+import { useTema } from './hooks/useTema';
 import { useWakeLock } from './hooks/useWakeLock';
 import type { Card } from './types';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [configAberta, setConfigAberta] = useState(false);
   const timerRef = useRef<number | undefined>(undefined);
 
+  useTema(prefs.tema);
   useWakeLock(prefs.telaAcesa);
 
   useEffect(() => {

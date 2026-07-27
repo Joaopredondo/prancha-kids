@@ -35,9 +35,13 @@ export interface CategoriaInfo {
 
 export type TamanhoCard = 'p' | 'm' | 'g';
 
+/** `auto` segue o sistema; as crianças reagem diferente a claro e escuro. */
+export type Tema = 'auto' | 'claro' | 'escuro';
+
 export interface Prefs {
   categoria: Categoria | 'tudo';
   tamanho: TamanhoCard;
+  tema: Tema;
   som: boolean;
   telaAcesa: boolean;
 }

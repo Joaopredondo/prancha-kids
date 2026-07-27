@@ -6,6 +6,7 @@ const CHAVE = 'prancha-kids:prefs';
 const PADRAO: Prefs = {
   categoria: 'essenciais',
   tamanho: 'm',
+  tema: 'auto',
   som: true,
   telaAcesa: true,
 };

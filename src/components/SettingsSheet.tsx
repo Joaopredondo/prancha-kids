@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { Classe, Prefs, TamanhoCard } from '../types';
+import type { Classe, Prefs, TamanhoCard, Tema } from '../types';
 
 interface Props {
   aberto: boolean;
@@ -13,6 +13,12 @@ const TAMANHOS: { id: TamanhoCard; label: string }[] = [
   { id: 'p', label: 'Pequeno' },
   { id: 'm', label: 'Médio' },
   { id: 'g', label: 'Grande' },
+];
+
+const TEMAS: { id: Tema; label: string }[] = [
+  { id: 'claro', label: '☀️ Claro' },
+  { id: 'escuro', label: '🌙 Escuro' },
+  { id: 'auto', label: '⚙️ Automático' },
 ];
 
 const LEGENDA: { classe: Classe; label: string }[] = [
@@ -71,29 +77,19 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
               </button>
             </div>
 
-            <section className="mb-5">
-              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--color-texto-suave)' }}>
-                Tamanho dos cards
-              </h3>
-              <div className="flex gap-2">
-                {TAMANHOS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => onDefinir('tamanho', t.id)}
-                    aria-pressed={prefs.tamanho === t.id}
-                    className="flex-1 rounded-2xl border-2 py-3 font-bold"
-                    style={{
-                      borderColor: prefs.tamanho === t.id ? 'var(--color-texto)' : 'var(--color-linha)',
-                      background: prefs.tamanho === t.id ? 'var(--color-texto)' : 'transparent',
-                      color: prefs.tamanho === t.id ? 'var(--color-fundo)' : 'var(--color-texto)',
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </section>
+            <Escolha
+              titulo="Tamanho dos cards"
+              opcoes={TAMANHOS}
+              valor={prefs.tamanho}
+              onMudar={(valor) => onDefinir('tamanho', valor)}
+            />
+
+            <Escolha
+              titulo="Cores da tela"
+              opcoes={TEMAS}
+              valor={prefs.tema}
+              onMudar={(valor) => onDefinir('tema', valor)}
+            />
 
             <section className="mb-5 space-y-2">
               <Interruptor
@@ -128,6 +124,50 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function Escolha<T extends string>({
+  titulo,
+  opcoes,
+  valor,
+  onMudar,
+}: {
+  titulo: string;
+  opcoes: { id: T; label: string }[];
+  valor: T;
+  onMudar: (valor: T) => void;
+}) {
+  return (
+    <section className="mb-5">
+      <h3
+        className="mb-2 text-sm font-bold uppercase tracking-wide"
+        style={{ color: 'var(--color-texto-suave)' }}
+      >
+        {titulo}
+      </h3>
+      <div className="flex gap-2">
+        {opcoes.map((opcao) => {
+          const ativa = opcao.id === valor;
+          return (
+            <button
+              key={opcao.id}
+              type="button"
+              onClick={() => onMudar(opcao.id)}
+              aria-pressed={ativa}
+              className="flex-1 rounded-2xl border-2 px-2 py-3 font-bold"
+              style={{
+                borderColor: ativa ? 'var(--color-texto)' : 'var(--color-linha)',
+                background: ativa ? 'var(--color-texto)' : 'transparent',
+                color: ativa ? 'var(--color-fundo)' : 'var(--color-texto)',
+              }}
+            >
+              {opcao.label}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

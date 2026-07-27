@@ -12,28 +12,53 @@
   --color-pessoa: #ca8a04;
   --color-urgencia: #dc2626;
 
+  /* Tema claro (padrão). */
   --color-fundo: #fbf7f0;
   --color-superficie: #ffffff;
   --color-texto: #1c1917;
   --color-texto-suave: #57534e;
   --color-linha: #e7e0d5;
+
+  /* Tema escuro: valores ficam só aqui, aplicados nos dois seletores abaixo. */
+  --color-escuro-fundo: #16150f;
+  --color-escuro-superficie: #232019;
+  --color-escuro-texto: #f5f1e8;
+  --color-escuro-texto-suave: #b3aa99;
+  --color-escuro-linha: #3b3529;
 }
 
 @layer base {
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --sombra-card: 0 2px 0 0 rgb(0 0 0 / 0.06), 0 6px 16px -8px rgb(0 0 0 / 0.18);
+    /* Quanto da cor da classe entra no fundo da figura do card. */
+    --mistura: 12%;
   }
 
+  /* Escuro por escolha do sistema, exceto se a pessoa fixou "claro". */
   @media (prefers-color-scheme: dark) {
-    :root {
-      --color-fundo: #16150f;
-      --color-superficie: #232019;
-      --color-texto: #f5f1e8;
-      --color-texto-suave: #b3aa99;
-      --color-linha: #3b3529;
+    :root:not([data-tema='claro']) {
+      color-scheme: dark;
+      --color-fundo: var(--color-escuro-fundo);
+      --color-superficie: var(--color-escuro-superficie);
+      --color-texto: var(--color-escuro-texto);
+      --color-texto-suave: var(--color-escuro-texto-suave);
+      --color-linha: var(--color-escuro-linha);
       --sombra-card: 0 2px 0 0 rgb(0 0 0 / 0.4), 0 6px 16px -8px rgb(0 0 0 / 0.6);
+      --mistura: 22%;
     }
+  }
+
+  /* Escuro fixado nas configurações, independente do sistema. */
+  :root[data-tema='escuro'] {
+    color-scheme: dark;
+    --color-fundo: var(--color-escuro-fundo);
+    --color-superficie: var(--color-escuro-superficie);
+    --color-texto: var(--color-escuro-texto);
+    --color-texto-suave: var(--color-escuro-texto-suave);
+    --color-linha: var(--color-escuro-linha);
+    --sombra-card: 0 2px 0 0 rgb(0 0 0 / 0.4), 0 6px 16px -8px rgb(0 0 0 / 0.6);
+    --mistura: 22%;
   }
 
   html,
@@ -59,7 +84,7 @@
 /* Cor do card por classe gramatical. */
 [data-classe] {
   --borda: var(--color-linha);
-  --tinta: color-mix(in oklab, var(--borda) 12%, var(--color-superficie));
+  --tinta: color-mix(in oklab, var(--borda) var(--mistura), var(--color-superficie));
 }
 [data-classe='acao'] { --borda: var(--color-acao); }
 [data-classe='coisa'] { --borda: var(--color-coisa); }
@@ -67,12 +92,6 @@
 [data-classe='social'] { --borda: var(--color-social); }
 [data-classe='pessoa'] { --borda: var(--color-pessoa); }
 [data-classe='urgencia'] { --borda: var(--color-urgencia); }
-
-@media (prefers-color-scheme: dark) {
-  [data-classe] {
-    --tinta: color-mix(in oklab, var(--borda) 22%, var(--color-superficie));
-  }
-}
 
 /* Tamanho do card escolhido nas configurações.
    O clamp mantém 3 colunas no celular e cards grandes no desktop. */
