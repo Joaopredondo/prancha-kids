@@ -1,0 +1,98 @@
+# Prancha Kids
+
+Prancha de comunicação (CAA) para crianças, com vocabulário do dia a dia e da igreja.
+Toque na figura → ouve a palavra. Funciona no navegador do celular, instala na tela
+inicial e roda offline.
+
+## Rodar
+
+```bash
+npm install
+npm run dev -- --host      # abra no celular pelo IP mostrado no terminal
+npm run build && npm run preview
+```
+
+> **Erro `ENOSPC: System limit for number of file watchers reached`** no `npm run dev`:
+> é limite do sistema, não do projeto. Corrija com
+> `sudo sysctl fs.inotify.max_user_watches=524288` (para persistir, adicione
+> `fs.inotify.max_user_watches=524288` em `/etc/sysctl.d/99-inotify.conf`).
+
+## Como o conteúdo funciona
+
+Tudo vem de `src/data/cards.ts` — 37 cards, cada um com:
+
+| campo | para que serve |
+|---|---|
+| `id` | nome dos arquivos: `public/img/{id}.webp` e `public/audio/{id}.mp3` |
+| `label` | texto exibido no card |
+| `fala` | texto falado, quando diferente do label (ex.: "Estou com medo") |
+| `emoji` | figura provisória, usada enquanto não existe imagem própria |
+| `categoria` | aba onde o card aparece |
+| `classe` | classe gramatical → cor da borda (código Fitzgerald) |
+
+**A ordem do array é a posição na prancha e não deve mudar** — a criança memoriza
+onde cada figura fica. Cards novos entram no fim da sua categoria.
+
+Cores (código Fitzgerald, padrão em CAA):
+verde = ações · laranja = coisas · azul = como estou · rosa = social ·
+amarelo = pessoas · vermelho = parar/não.
+
+## Áudio
+
+O app toca `public/audio/{id}.mp3` quando o arquivo existe e cai para a voz do
+navegador (`speechSynthesis`) quando não existe — nunca fica mudo.
+
+Como a voz do navegador varia muito entre aparelhos (Android costuma ter voz pt-BR
+ruim ou nenhuma), o ideal é gerar os 37 arquivos uma vez:
+
+1. **Gravado por uma pessoa** (melhor resultado com criança): grave cada palavra
+   nomeando o arquivo com o id do card e rode
+   `./scripts/normalizar-audio.sh ~/pasta-das-gravacoes`.
+2. **TTS de qualidade**: gere os MP3 com Google Cloud TTS, Azure Neural ou
+   ElevenLabs em pt-BR e coloque em `public/audio/` com o nome do id.
+
+## Imagens
+
+Coloque `public/img/{id}.webp` (512×512 sugerido). Sem imagem, o card mostra o
+emoji — o app já é usável assim, mas **emoji é só provisório**: é abstrato demais
+para vários conceitos ("acabou" 🏁, "esperar" ⏳, "quero mais" ➕) e o desenho muda
+entre Android, iPhone e desktop, o que atrapalha o reconhecimento.
+
+Ordem de produção recomendada:
+
+1. **Foto real** (celular, fundo neutro) das pessoas e objetos do cotidiano da
+   criança — é o que ela reconhece mais rápido:
+   `ir-com-a-mamae`, `ir-com-o-papai`, `eu`, `voce`, `agua`, `banheiro`, `comer`,
+   `parquinho`, `atividade`, `louvor`.
+2. **Pictograma ARASAAC** (`arasaac.org`, CC BY-NC-SA, exige atribuição) para
+   verbos e abstratos: `quero`, `quero-mais`, `acabou`, `esperar`, `ajuda`,
+   `parar`, `pegar`, `subir`.
+3. Sentimentos (`feliz`, `triste`, `bravo`, `nervoso`, `medo`) podem ficar por
+   último: expressão facial já é naturalmente reconhecível.
+
+Antes de escolher, pergunte à fonoaudióloga/professora qual sistema simbólico a
+criança já usa (ARASAAC, PCS/Boardmaker, PECS). Usar o mesmo símbolo em casa,
+escola e igreja vale mais que a qualidade isolada do símbolo.
+
+## Assets parciais
+
+Foto e áudio são resolvidos **card a card**: dá para subir 5 fotos hoje e o resto
+no mês que vem. Um card pode ter foto sem gravação, gravação sem foto, ou nenhum
+dos dois.
+
+O plugin `manifesto-de-assets` (em `vite.config.ts`) lê `public/img` e
+`public/audio` durante o build e entrega a lista ao app como `virtual:assets` —
+por isso não existe requisição 404 para arquivo que ainda não foi feito. Em
+`npm run dev`, largar um arquivo novo na pasta recarrega a página sozinho.
+**Depois de adicionar assets, rode `npm run build` de novo** para eles entrarem no
+cache offline.
+
+## Deploy
+
+Build estático em `dist/`. Publique em Cloudflare Pages, Vercel ou Netlify
+(build `npm run build`, diretório `dist`). Precisa de HTTPS para o PWA instalar.
+
+## Stack
+
+Vite · React 19 · TypeScript · Tailwind CSS v4 · Howler.js · Motion ·
+vite-plugin-pwa (Workbox) · Nunito (fonte local, sem CDN).

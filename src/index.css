@@ -1,0 +1,90 @@
+@import '@fontsource-variable/nunito';
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Nunito Variable', ui-rounded, system-ui, sans-serif;
+
+  /* Código Fitzgerald: cada classe gramatical tem uma cor fixa. */
+  --color-acao: #16a34a;
+  --color-coisa: #ea580c;
+  --color-descricao: #2563eb;
+  --color-social: #db2777;
+  --color-pessoa: #ca8a04;
+  --color-urgencia: #dc2626;
+
+  --color-fundo: #fbf7f0;
+  --color-superficie: #ffffff;
+  --color-texto: #1c1917;
+  --color-texto-suave: #57534e;
+  --color-linha: #e7e0d5;
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --sombra-card: 0 2px 0 0 rgb(0 0 0 / 0.06), 0 6px 16px -8px rgb(0 0 0 / 0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-fundo: #16150f;
+      --color-superficie: #232019;
+      --color-texto: #f5f1e8;
+      --color-texto-suave: #b3aa99;
+      --color-linha: #3b3529;
+      --sombra-card: 0 2px 0 0 rgb(0 0 0 / 0.4), 0 6px 16px -8px rgb(0 0 0 / 0.6);
+    }
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-fundo);
+    color: var(--color-texto);
+    font-family: var(--font-sans);
+    /* Nada de seleção de texto, pull-to-refresh ou zoom por duplo toque:
+       são gestos que a criança dispara sem querer. */
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Cor do card por classe gramatical. */
+[data-classe] {
+  --borda: var(--color-linha);
+  --tinta: color-mix(in oklab, var(--borda) 12%, var(--color-superficie));
+}
+[data-classe='acao'] { --borda: var(--color-acao); }
+[data-classe='coisa'] { --borda: var(--color-coisa); }
+[data-classe='descricao'] { --borda: var(--color-descricao); }
+[data-classe='social'] { --borda: var(--color-social); }
+[data-classe='pessoa'] { --borda: var(--color-pessoa); }
+[data-classe='urgencia'] { --borda: var(--color-urgencia); }
+
+@media (prefers-color-scheme: dark) {
+  [data-classe] {
+    --tinta: color-mix(in oklab, var(--borda) 22%, var(--color-superficie));
+  }
+}
+
+/* Tamanho do card escolhido nas configurações.
+   O clamp mantém 3 colunas no celular e cards grandes no desktop. */
+[data-tamanho='p'] { --card-min: clamp(4.75rem, 22vw, 7rem); }
+[data-tamanho='m'] { --card-min: clamp(6rem, 28vw, 10rem); }
+[data-tamanho='g'] { --card-min: clamp(8rem, 42vw, 14rem); }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
