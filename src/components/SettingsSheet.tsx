@@ -17,6 +17,7 @@ interface Props {
   prefs: Prefs;
   onDefinir: <K extends keyof Prefs>(chave: K, valor: Prefs[K]) => void;
   onFechar: () => void;
+  onGravarVozes: () => void;
 }
 
 const TAMANHOS: { id: TamanhoCard; label: string }[] = [
@@ -40,7 +41,7 @@ const LEGENDA: { classe: Classe; label: string }[] = [
   { classe: 'urgencia', label: 'Parar / não' },
 ];
 
-export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
+export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVozes }: Props) {
   useEffect(() => {
     if (!aberto) return;
     const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
@@ -112,6 +113,26 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
                 ativo={prefs.telaAcesa}
                 onMudar={(v) => onDefinir('telaAcesa', v)}
               />
+            </section>
+
+            <section className="mb-5">
+              <h3
+                className="mb-2 text-sm font-bold uppercase tracking-wide"
+                style={{ color: 'var(--color-texto-suave)' }}
+              >
+                Vozes dos cards
+              </h3>
+              <BotaoDeAcao
+                rotulo="Gravar vozes dos cards"
+                aoTocar={() => {
+                  onGravarVozes();
+                  onFechar();
+                }}
+              />
+              <p className="mt-2 text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+                Grave cada palavra com a voz de quem a criança conhece. Vale mais que o áudio
+                do app e fica só neste aparelho.
+              </p>
             </section>
 
             <TravaDeAcesso />

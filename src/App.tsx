@@ -5,11 +5,12 @@ import { Board } from './components/Board';
 import { Ficha } from './components/Ficha';
 import { Footer } from './components/Footer';
 import { Frequencia } from './components/Frequencia';
+import { GravarVozes } from './components/GravarVozes';
 import { MainNav, type Vista } from './components/MainNav';
 import { PortaoDePin } from './components/PortaoDePin';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
-import { desbloquearAudio, prepararSons, tocarCard } from './audio/player';
+import { carregarVozes, desbloquearAudio, prepararSons, tocarCard } from './audio/player';
 import { estaDestrancado } from './dados/seguranca';
 import { usePrefs } from './hooks/usePrefs';
 import { useTema } from './hooks/useTema';
@@ -32,6 +33,7 @@ export default function App() {
     const liberar = () => desbloquearAudio();
     document.addEventListener('pointerdown', liberar, { once: true });
     prepararSons(CARDS);
+    void carregarVozes(CARDS);
     return () => document.removeEventListener('pointerdown', liberar);
   }, []);
 
@@ -95,6 +97,7 @@ export default function App() {
           <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
         )}
         {vista === 'agora' && <AgoraEDepois som={prefs.som} />}
+        {vista === 'vozes' && (destrancado ? <GravarVozes /> : <PortaoDePin aoAbrir={() => setDestrancado(true)} />)}
         {/* Ficha e frequência têm dado de saúde de menor: passam pelo código,
             quando houver um configurado. */}
         {(vista === 'ficha' || vista === 'frequencia') &&
@@ -112,6 +115,7 @@ export default function App() {
         prefs={prefs}
         onDefinir={definir}
         onFechar={() => setConfigAberta(false)}
+        onGravarVozes={() => setVista('vozes')}
       />
     </div>
   );
