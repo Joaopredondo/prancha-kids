@@ -9,6 +9,7 @@ import {
   type Backup,
 } from '../dados/backup';
 import { listarFichas } from '../dados/fichas';
+import { Conta } from './Conta';
 import { conferirPin, definirPin, estaDestrancado, removerPin, temPin } from '../dados/seguranca';
 import type { Classe, Prefs, TamanhoCard, Tema } from '../types';
 
@@ -134,6 +135,8 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVoze
                 do app e fica só neste aparelho.
               </p>
             </section>
+
+            <Conta />
 
             <TravaDeAcesso />
 

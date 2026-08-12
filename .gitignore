@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Chaves do Supabase e afins: nunca no repositório
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
