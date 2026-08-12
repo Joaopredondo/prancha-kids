@@ -346,13 +346,15 @@ function MontarRotina({
               data-classe={figurinha.classe}
               onClick={() => aoAdicionar(figurinha.id)}
               aria-label={`Acrescentar ${figurinha.nome} à rotina`}
-              className="grid w-24 shrink-0 snap-start grid-rows-[2.25rem_2.5rem] justify-items-center gap-1 rounded-2xl border-[3px] p-2"
+              className="grid w-24 shrink-0 snap-start grid-rows-[2.25rem_2.5rem] place-items-center gap-1 rounded-2xl border-[3px] p-2"
               style={{ borderColor: 'var(--borda)', background: 'var(--tinta)' }}
             >
-              <span aria-hidden="true" className="text-3xl leading-none">
+              <span aria-hidden="true" className="grid place-items-center text-3xl leading-none">
                 {figurinha.emoji}
               </span>
-              <span className="text-center text-xs font-bold leading-tight">{figurinha.nome}</span>
+              <span className="flex items-center text-center text-xs font-bold leading-tight">
+                {figurinha.nome}
+              </span>
             </button>
           ))}
         </div>
