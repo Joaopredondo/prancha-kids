@@ -24,11 +24,20 @@ export type ResumoDaCrianca = {
   estadoMaisComum: string | null;
 };
 
+/**
+ * Só devolve o estado quando ele é maioria de verdade.
+ *
+ * Com 1 "calmo" e 1 "crise", dizer "quase sempre crise" é afirmação inventada
+ * a partir de empate — e aqui isso descreveria uma criança.
+ */
 const contarMaisComum = (valores: string[]): string | null => {
   if (valores.length === 0) return null;
+
   const contagem = new Map<string, number>();
   valores.forEach((valor) => contagem.set(valor, (contagem.get(valor) ?? 0) + 1));
-  return [...contagem.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+  const [estado, vezes] = [...contagem.entries()].sort((a, b) => b[1] - a[1])[0];
+  return vezes > valores.length / 2 ? estado : null;
 };
 
 /**

@@ -315,7 +315,9 @@ export function Ficha() {
               className="min-h-12 rounded-2xl border-2 px-4 text-base font-bold"
               style={{ borderColor: 'var(--color-linha)' }}
             >
-              {ROTULOS_DE_MARCACAO[tipo]}
+              {/* O relógio separa isto do grupo "Estado emocional", que tem
+                  opção com o mesmo nome logo acima. */}
+              ⏱ {ROTULOS_DE_MARCACAO[tipo]}
             </button>
           ))}
         </div>
