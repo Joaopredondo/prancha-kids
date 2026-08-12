@@ -1,5 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import {
+  baixar,
+  fichasParaCsv,
+  montarBackup,
+  nomeComData,
+  restaurarBackup,
+  type Backup,
+} from '../dados/backup';
+import { listarFichas } from '../dados/fichas';
 import type { Classe, Prefs, TamanhoCard, Tema } from '../types';
 
 interface Props {
@@ -104,6 +113,8 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
               />
             </section>
 
+            <CopiaDeSeguranca />
+
             <section>
               <h3 className="mb-2 text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--color-texto-suave)' }}>
                 O que as cores significam
@@ -124,6 +135,90 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/**
+ * Cópia de segurança das fichas, cadastros e fotos.
+ *
+ * Sem isso, limpar os dados do navegador ou trocar de aparelho apaga tudo sem
+ * recuperação — não há servidor onde buscar de volta.
+ */
+function CopiaDeSeguranca() {
+  const arquivo = useRef<HTMLInputElement>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  const exportarTudo = async () => {
+    const backup = await montarBackup();
+    baixar(nomeComData('prancha-kids-backup', 'json'), JSON.stringify(backup), 'application/json');
+    setAviso(`Exportadas ${backup.fichas.length} fichas e ${backup.perfis.length} cadastros.`);
+  };
+
+  const exportarCsv = () => {
+    const fichas = listarFichas();
+    baixar(nomeComData('fichas', 'csv'), fichasParaCsv(fichas), 'text/csv;charset=utf-8');
+    setAviso(`${fichas.length} fichas no CSV.`);
+  };
+
+  const importar = async (entrada: File | undefined) => {
+    if (!entrada) return;
+    try {
+      const backup = JSON.parse(await entrada.text()) as Backup;
+      const { perfis, fichas } = await restaurarBackup(backup);
+      setAviso(`Restaurados ${fichas} fichas e ${perfis} cadastros. Recarregando…`);
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (erro) {
+      setAviso(`Não deu para restaurar: ${(erro as Error).message}`);
+    }
+  };
+
+  return (
+    <section className="mb-5">
+      <h3
+        className="mb-2 text-sm font-bold uppercase tracking-wide"
+        style={{ color: 'var(--color-texto-suave)' }}
+      >
+        Cópia de segurança
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        <BotaoDeAcao rotulo="Exportar tudo (JSON)" aoTocar={() => void exportarTudo()} />
+        <BotaoDeAcao rotulo="Exportar fichas (CSV)" aoTocar={exportarCsv} />
+        <BotaoDeAcao rotulo="Restaurar backup" aoTocar={() => arquivo.current?.click()} />
+      </div>
+      <input
+        ref={arquivo}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={(e) => {
+          void importar(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <p className="mt-2 text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+        Tudo fica só neste aparelho. Limpar os dados do navegador apaga fichas, cadastros e
+        fotos — exporte antes de trocar de tablet. Restaurar junta com o que já existe, não
+        apaga nada.
+      </p>
+      {aviso && (
+        <p className="mt-2 text-sm font-bold" style={{ color: 'var(--color-acao)' }}>
+          {aviso}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function BotaoDeAcao({ rotulo, aoTocar }: { rotulo: string; aoTocar: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={aoTocar}
+      className="min-h-12 rounded-2xl border-2 px-4 text-base font-bold"
+      style={{ borderColor: 'var(--color-linha)' }}
+    >
+      {rotulo}
+    </button>
   );
 }
 
