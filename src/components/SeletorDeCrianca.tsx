@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { apagarArquivo, chaveDaFoto, reduzirImagem, salvarArquivo } from '../dados/arquivos';
 import { perfilVazio, type Perfil } from '../dados/perfis';
+import { useArquivo } from '../hooks/useArquivo';
 
 interface Props {
   perfis: Perfil[];
@@ -25,12 +27,31 @@ export function SeletorDeCrianca({
 }: Props) {
   const [emEdicao, setEmEdicao] = useState<Perfil | null>(null);
   const [confirmando, setConfirmando] = useState<string | null>(null);
+  /** Muda a cada troca de foto para o `useArquivo` reler o mesmo endereço. */
+  const [versaoDaFoto, setVersaoDaFoto] = useState(0);
+  const seletorDeArquivo = useRef<HTMLInputElement>(null);
 
   const guardar = () => {
     if (!emEdicao) return;
     onSalvar(emEdicao);
     onEscolher(emEdicao.id);
     setEmEdicao(null);
+  };
+
+  const trocarFoto = async (arquivo: File | undefined) => {
+    if (!arquivo || !emEdicao) return;
+    // Reduz para 256 px antes de guardar: foto crua de celular tem alguns MB.
+    const reduzida = await reduzirImagem(arquivo);
+    await salvarArquivo(chaveDaFoto(emEdicao.id), reduzida);
+    setVersaoDaFoto((v) => v + 1);
+    setEmEdicao({ ...emEdicao, temFoto: true });
+  };
+
+  const tirarFoto = async () => {
+    if (!emEdicao) return;
+    await apagarArquivo(chaveDaFoto(emEdicao.id));
+    setVersaoDaFoto((v) => v + 1);
+    setEmEdicao({ ...emEdicao, temFoto: false });
   };
 
   return (
@@ -54,13 +75,14 @@ export function SeletorDeCrianca({
                 type="button"
                 onClick={() => onEscolher(perfil.id)}
                 aria-pressed={ativo}
-                className="min-h-12 rounded-full border-2 px-4 text-base font-bold"
+                className="flex min-h-12 items-center gap-2 rounded-full border-2 py-1 pl-1 pr-4 text-base font-bold"
                 style={{
                   borderColor: ativo ? 'transparent' : 'var(--color-linha)',
                   background: ativo ? 'var(--color-texto)' : 'transparent',
                   color: ativo ? 'var(--color-fundo)' : 'var(--color-texto)',
                 }}
               >
+                <Retrato perfil={perfil} lado="2.25rem" versao={versaoDaFoto} />
                 {perfil.nome || 'Sem nome'}
                 {perfil.idade && (
                   <span className="ml-2 text-sm font-normal opacity-70">{perfil.idade}</span>
@@ -104,6 +126,51 @@ export function SeletorDeCrianca({
 
       {emEdicao && (
         <div className="mt-4 flex flex-col gap-3 rounded-2xl border-2 p-3" style={{ borderColor: 'var(--color-linha)' }}>
+          <div className="flex items-center gap-3">
+            <Retrato perfil={emEdicao} lado="4.5rem" versao={versaoDaFoto} />
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => seletorDeArquivo.current?.click()}
+                  className="min-h-11 rounded-2xl border-2 px-4 text-sm font-bold"
+                  style={{ borderColor: 'var(--color-linha)' }}
+                >
+                  {emEdicao.temFoto ? 'Trocar foto' : 'Adicionar foto'}
+                </button>
+                {emEdicao.temFoto && (
+                  <button
+                    type="button"
+                    onClick={() => void tirarFoto()}
+                    className="min-h-11 rounded-2xl border-2 px-4 text-sm font-bold"
+                    style={{
+                      borderColor: 'var(--color-linha)',
+                      color: 'var(--color-urgencia)',
+                    }}
+                  >
+                    Tirar foto
+                  </button>
+                )}
+              </div>
+              {/* Rosto de menor junto com nome e laudo, num aparelho sem senha:
+                  o aviso precisa estar onde a foto é escolhida. */}
+              <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+                Opcional. Peça autorização dos pais. A foto fica só neste aparelho e some ao
+                apagar a criança.
+              </p>
+            </div>
+            <input
+              ref={seletorDeArquivo}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                void trocarFoto(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+          </div>
+
           <Campo
             rotulo="Nome"
             valor={emEdicao.nome}
@@ -177,6 +244,35 @@ export function SeletorDeCrianca({
         </div>
       )}
     </section>
+  );
+}
+
+/** Foto da criança, ou a inicial do nome enquanto não houver foto. */
+export function Retrato({
+  perfil,
+  lado,
+  versao = 0,
+}: {
+  perfil: Perfil;
+  lado: string;
+  versao?: number;
+}) {
+  const url = useArquivo(perfil.temFoto ? chaveDaFoto(perfil.id) : null, versao);
+
+  return (
+    <span
+      aria-hidden="true"
+      className="grid shrink-0 place-items-center overflow-hidden rounded-full border-2 bg-cover bg-center text-base font-extrabold"
+      style={{
+        width: lado,
+        height: lado,
+        borderColor: 'var(--color-linha)',
+        background: url ? `url(${url}) center/cover` : 'var(--color-fundo)',
+        color: 'var(--color-texto-suave)',
+      }}
+    >
+      {!url && (perfil.nome.trim()[0]?.toUpperCase() ?? '?')}
+    </span>
   );
 }
 

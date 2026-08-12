@@ -23,6 +23,7 @@ import {
   salvarFicha,
   type Filtro,
 } from '../dados/fichas';
+import { apagarArquivo, chaveDaFoto } from '../dados/arquivos';
 import { apagarPerfil, listarPerfis, perfilPorId, salvarPerfil, type Perfil } from '../dados/perfis';
 import { SeletorDeCrianca } from './SeletorDeCrianca';
 
@@ -138,6 +139,7 @@ export function Ficha() {
         }}
         onApagar={(perfil) => {
           apagarFichasDoPerfil(perfil.id);
+          void apagarArquivo(chaveDaFoto(perfil.id));
           apagarPerfil(perfil.id);
           setPerfis(listarPerfis());
           setAnteriores(listarFichas());
