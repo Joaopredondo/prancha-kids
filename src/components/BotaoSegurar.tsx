@@ -7,6 +7,7 @@ interface Props {
   rotulo: string;
   ativo: boolean;
   aoCompletar: () => void;
+  emoji?: string;
 }
 
 /**
@@ -16,7 +17,7 @@ interface Props {
  * enquanto mexe no tablet. O progresso é mostrado porque um botão que "não
  * funciona" ao toque simples é indistinguível de um botão quebrado.
  */
-export function BotaoSegurar({ rotulo, ativo, aoCompletar }: Props) {
+export function BotaoSegurar({ rotulo, ativo, aoCompletar, emoji = '📋' }: Props) {
   const [progresso, setProgresso] = useState(0);
   const inicio = useRef<number | null>(null);
   const quadro = useRef<number | null>(null);
@@ -80,7 +81,7 @@ export function BotaoSegurar({ rotulo, ativo, aoCompletar }: Props) {
       />
       <span className="relative flex items-center gap-2">
         <span aria-hidden="true" className="text-lg">
-          📋
+          {emoji}
         </span>
         {rotulo}
         {progresso > 0 && ' — segure'}

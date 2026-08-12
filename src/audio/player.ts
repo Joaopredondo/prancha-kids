@@ -2,10 +2,13 @@ import { Howl, Howler } from 'howler';
 import type { Card } from '../types';
 import { falaDoCard } from '../data/cards';
 import { temAudio } from '../assets/disponibilidade';
+import { chaveDaVoz, lerArquivo } from '../dados/arquivos';
 
 const BASE = import.meta.env.BASE_URL;
 
 const sons = new Map<string, Howl>();
+/** Gravações feitas no próprio aparelho, por id de card. */
+const vozes = new Map<string, string>();
 /** Cards cujo MP3 não existe/falhou: vão direto para a voz do navegador. */
 const semArquivo = new Set<string>();
 /** Card cujo toque ainda espera o áudio carregar. */
@@ -83,14 +86,20 @@ function obterSom(card: Card): Howl {
 }
 
 /**
- * Toca o nome do card. Usa o MP3 gravado quando existe e cai para a voz
- * do navegador quando não existe — a prancha nunca fica muda.
+ * Toca o nome do card, na ordem: gravação feita no aparelho, MP3 do app, voz do
+ * navegador. A gravação vem primeiro porque é a voz que a criança conhece.
  */
 export function tocarCard(card: Card) {
   // Corta o que estava tocando: toques rápidos não podem sobrepor.
   Howler.stop();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   pendente = null;
+
+  const gravada = vozes.get(card.id);
+  if (gravada) {
+    new Audio(gravada).play().catch(() => falar(falaDoCard(card)));
+    return;
+  }
 
   if (!temAudio(card.id) || semArquivo.has(card.id)) {
     falar(falaDoCard(card));
@@ -99,6 +108,24 @@ export function tocarCard(card: Card) {
 
   pendente = card.id;
   obterSom(card).play();
+}
+
+/** Carrega as gravações do aparelho para o toque sair sem espera. */
+export async function carregarVozes(cards: Card[]) {
+  for (const card of cards) {
+    const blob = await lerArquivo(chaveDaVoz(card.id));
+    if (blob) vozes.set(card.id, URL.createObjectURL(blob));
+  }
+}
+
+/** Chamado ao gravar ou apagar: recarrega aquela voz na próxima vez. */
+export function esquecerVoz(cardId: string) {
+  const url = vozes.get(cardId);
+  if (url) URL.revokeObjectURL(url);
+  vozes.delete(cardId);
+  void lerArquivo(chaveDaVoz(cardId)).then((blob) => {
+    if (blob) vozes.set(cardId, URL.createObjectURL(blob));
+  });
 }
 
 /** Pré-carrega só os cards que já têm gravação, para o toque sair sem atraso. */

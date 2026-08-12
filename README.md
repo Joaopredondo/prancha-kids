@@ -132,8 +132,18 @@ cache offline.
 
 ## Deploy
 
-Build estático em `dist/`. Publique em Cloudflare Pages, Vercel ou Netlify
-(build `npm run build`, diretório `dist`). Precisa de HTTPS para o PWA instalar.
+Hospedado na **Vercel**, ligado ao repositório: todo push na `main` publica em
+produção, e push em qualquer outra branch gera uma URL de pré-visualização.
+Build `npm run build`, saída `dist` — detectados sozinhos pela Vercel.
+
+Para trabalhar sem publicar direto (recomendado para tudo que mexa em ficha,
+perfil ou rotina salva, porque um erro ali apaga registro de criança):
+
+```bash
+git switch -c minha-mudanca
+git push -u origin minha-mudanca   # abre um Preview Deployment
+git switch main && git merge minha-mudanca && git push
+```
 
 ## Stack
 

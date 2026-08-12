@@ -5,7 +5,7 @@ import type { Categoria } from '../types';
 import { BotaoSegurar } from './BotaoSegurar';
 
 export type Aba = Categoria | 'tudo';
-export type Vista = 'prancha' | 'agora' | 'ficha';
+export type Vista = 'prancha' | 'agora' | 'ficha' | 'frequencia' | 'vozes';
 
 interface Props {
   vista: Vista;
@@ -13,6 +13,7 @@ interface Props {
   onAba: (aba: Aba) => void;
   onAgora: () => void;
   onFicha: () => void;
+  onFrequencia: () => void;
 }
 
 const ABAS: { id: Aba; label: string; emoji: string }[] = [
@@ -25,7 +26,7 @@ const ABAS: { id: Aba; label: string; emoji: string }[] = [
  * ao lado, como irmã, e não dentro da prancha — são dois usos diferentes, um da
  * criança e outro do voluntário.
  */
-export function MainNav({ vista, aba, onAba, onAgora, onFicha }: Props) {
+export function MainNav({ vista, aba, onAba, onAgora, onFicha, onFrequencia }: Props) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
 
@@ -151,6 +152,13 @@ export function MainNav({ vista, aba, onAba, onAgora, onFicha }: Props) {
       </button>
 
       <BotaoSegurar rotulo="Ficha do culto" ativo={vista === 'ficha'} aoCompletar={onFicha} />
+
+      <BotaoSegurar
+        rotulo="Frequência"
+        emoji="📊"
+        ativo={vista === 'frequencia'}
+        aoCompletar={onFrequencia}
+      />
     </nav>
   );
 }

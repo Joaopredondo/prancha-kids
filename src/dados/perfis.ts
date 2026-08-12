@@ -13,6 +13,8 @@ export type Perfil = {
   nome: string;
   idade: string;
   laudo: string;
+  /** Foto opcional; o arquivo em si mora no IndexedDB (`arquivos.ts`). */
+  temFoto?: boolean;
   criadoEm: number;
 };
 

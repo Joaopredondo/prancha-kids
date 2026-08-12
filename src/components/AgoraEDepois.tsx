@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { falarTexto } from '../audio/player';
 import { temImagem } from '../assets/disponibilidade';
 import { FIGURINHAS, figurinhaPorId, type Figurinha } from '../dados/figurinhas';
+import { listarPerfis, type Perfil } from '../dados/perfis';
 import { lerRotina, salvarRotina } from '../dados/rotinas';
 import {
   adicionar,
@@ -24,6 +25,9 @@ const BASE = import.meta.env.BASE_URL;
 
 type Modo = 'crianca' | 'voluntario';
 
+/** Última criança escolhida aqui; sobrevive ao recarregamento no meio do culto. */
+const CHAVE_DA_CRIANCA = 'prancha-kids:crianca-da-rotina';
+
 /**
  * Agora e depois — apoio de transição entre atividades, portado do Lume.
  *
@@ -43,9 +47,15 @@ export function AgoraEDepois({ som }: { som: boolean }) {
   const [estado, setEstado] = useState<EstadoDaRotina>(() => rotinaInicial());
   const [modo, setModo] = useState<Modo>('voluntario');
   const [montando, setMontando] = useState(false);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
+  const [perfilId, setPerfilId] = useState<string | null>(() =>
+    localStorage.getItem(CHAVE_DA_CRIANCA),
+  );
 
-  // A rotina do culto é a mesma toda semana; redigitar a cada vez inviabiliza.
-  useEffect(() => setEstado(lerRotina()), []);
+  useEffect(() => setPerfis(listarPerfis()), []);
+
+  // Cada criança tem a sua rotina; sem criança escolhida, vale a geral.
+  useEffect(() => setEstado(lerRotina(perfilId)), [perfilId]);
 
   const anunciar = useCallback(
     (texto: string) => {
@@ -54,10 +64,19 @@ export function AgoraEDepois({ som }: { som: boolean }) {
     [som],
   );
 
-  const guardar = useCallback((proximo: EstadoDaRotina) => {
-    setEstado(proximo);
-    salvarRotina(proximo);
-  }, []);
+  const guardar = useCallback(
+    (proximo: EstadoDaRotina) => {
+      setEstado(proximo);
+      salvarRotina(proximo, perfilId);
+    },
+    [perfilId],
+  );
+
+  const escolherCrianca = (id: string | null) => {
+    setPerfilId(id);
+    if (id) localStorage.setItem(CHAVE_DA_CRIANCA, id);
+    else localStorage.removeItem(CHAVE_DA_CRIANCA);
+  };
 
   const concluirPasso = () => {
     if (estaNoFim(estado)) {
@@ -75,6 +94,27 @@ export function AgoraEDepois({ som }: { som: boolean }) {
 
   return (
     <div className="flex flex-col gap-4 px-3 pb-6 sm:px-4">
+      {noVoluntario && perfis.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-bold" style={{ color: 'var(--color-texto-suave)' }}>
+            Rotina de
+          </span>
+          <ChipDeCrianca
+            rotulo="Geral"
+            ativo={perfilId === null}
+            aoTocar={() => escolherCrianca(null)}
+          />
+          {perfis.map((perfil) => (
+            <ChipDeCrianca
+              key={perfil.id}
+              rotulo={perfil.nome || 'Sem nome'}
+              ativo={perfilId === perfil.id}
+              aoTocar={() => escolherCrianca(perfil.id)}
+            />
+          ))}
+        </div>
+      )}
+
       <FaixaDaRotina
         estado={estado}
         aoEscolher={(posicao) => {
@@ -386,6 +426,32 @@ function BotaoDeLinha({
       aria-label={descricao}
       className="size-11 rounded-xl border-2 text-lg font-bold disabled:opacity-30"
       style={{ borderColor: 'var(--color-linha)', color: cor ?? 'var(--color-texto)' }}
+    >
+      {rotulo}
+    </button>
+  );
+}
+
+function ChipDeCrianca({
+  rotulo,
+  ativo,
+  aoTocar,
+}: {
+  rotulo: string;
+  ativo: boolean;
+  aoTocar: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={aoTocar}
+      aria-pressed={ativo}
+      className="min-h-11 rounded-full border-2 px-3 text-sm font-bold"
+      style={{
+        borderColor: ativo ? 'transparent' : 'var(--color-linha)',
+        background: ativo ? 'var(--color-texto)' : 'transparent',
+        color: ativo ? 'var(--color-fundo)' : 'var(--color-texto)',
+      }}
     >
       {rotulo}
     </button>

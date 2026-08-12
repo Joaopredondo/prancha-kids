@@ -11,13 +11,20 @@ import { rotinaInicial, type EstadoDaRotina } from './rotina';
 
 const CHAVE = 'prancha-kids:rotina';
 
+/**
+ * Cada criança tem a sua rotina; sem criança escolhida, vale a rotina geral do
+ * aparelho. A chave antiga (sem sufixo) continua sendo a geral, então nada do
+ * que já estava salvo se perde.
+ */
+const chaveDe = (perfilId: string | null) => (perfilId ? `${CHAVE}:${perfilId}` : CHAVE);
+
 type Salvo = { rotina: string[]; indice: number; dia: string };
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 
-export function lerRotina(): EstadoDaRotina {
+export function lerRotina(perfilId: string | null = null): EstadoDaRotina {
   try {
-    const bruto = localStorage.getItem(CHAVE);
+    const bruto = localStorage.getItem(chaveDe(perfilId));
     if (!bruto) return rotinaInicial();
 
     const salvo = JSON.parse(bruto) as Partial<Salvo>;
@@ -29,10 +36,10 @@ export function lerRotina(): EstadoDaRotina {
   }
 }
 
-export function salvarRotina(estado: EstadoDaRotina): void {
+export function salvarRotina(estado: EstadoDaRotina, perfilId: string | null = null): void {
   try {
     const salvo: Salvo = { rotina: estado.rotina, indice: estado.indice, dia: hoje() };
-    localStorage.setItem(CHAVE, JSON.stringify(salvo));
+    localStorage.setItem(chaveDe(perfilId), JSON.stringify(salvo));
   } catch {
     // Modo privado ou armazenamento cheio: a rotina da tela continua valendo.
   }
