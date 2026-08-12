@@ -9,7 +9,7 @@ import {
   type Backup,
 } from '../dados/backup';
 import { listarFichas } from '../dados/fichas';
-import { definirPin, removerPin, temPin } from '../dados/seguranca';
+import { conferirPin, definirPin, estaDestrancado, removerPin, temPin } from '../dados/seguranca';
 import type { Classe, Prefs, TamanhoCard, Tema } from '../types';
 
 interface Props {
@@ -170,15 +170,47 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVoze
  */
 function TravaDeAcesso() {
   const [configurado, setConfigurado] = useState(() => temPin());
+  const [etapa, setEtapa] = useState<'parado' | 'trocar' | 'remover'>('parado');
+  const [atual, setAtual] = useState('');
   const [novo, setNovo] = useState('');
-  const [editando, setEditando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
-  const guardar = async () => {
-    if (novo.length !== 4) return;
+  const parar = () => {
+    setEtapa('parado');
+    setAtual('');
+    setNovo('');
+    setErro(null);
+  };
+
+  /**
+   * Trocar ou remover exige o código atual. Sem isso a trava não vale nada:
+   * as Configurações estão abertas a qualquer um, e bastaria remover o código
+   * ali para entrar na ficha.
+   */
+  const conferirAtual = async () => {
+    if (!configurado) return true;
+    if (await conferirPin(atual)) return true;
+    setErro('Código atual errado.');
+    setAtual('');
+    return false;
+  };
+
+  const trocar = async () => {
+    if (novo.length !== 4) {
+      setErro('O novo código precisa ter 4 dígitos.');
+      return;
+    }
+    if (!(await conferirAtual())) return;
     await definirPin(novo);
     setConfigurado(true);
-    setEditando(false);
-    setNovo('');
+    parar();
+  };
+
+  const remover = async () => {
+    if (!(await conferirAtual())) return;
+    removerPin();
+    setConfigurado(false);
+    parar();
   };
 
   return (
@@ -190,41 +222,53 @@ function TravaDeAcesso() {
         Código do voluntário
       </h3>
 
-      {editando ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={novo}
-            aria-label="Novo código de 4 dígitos"
-            onChange={(e) => setNovo(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            className="min-h-12 w-28 rounded-2xl border-2 text-center text-xl font-extrabold tracking-[0.3em]"
-            style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
-          />
-          <BotaoDeAcao rotulo="Guardar código" aoTocar={() => void guardar()} />
-          <BotaoDeAcao
-            rotulo="Cancelar"
-            aoTocar={() => {
-              setEditando(false);
-              setNovo('');
-            }}
-          />
+      {etapa !== 'parado' ? (
+        <div className="flex flex-col gap-2">
+          {configurado && (
+            <CampoDeCodigo
+              rotulo="Código atual"
+              valor={atual}
+              aoMudar={(v) => {
+                setAtual(v);
+                setErro(null);
+              }}
+              erro={Boolean(erro)}
+            />
+          )}
+          {etapa === 'trocar' && (
+            <CampoDeCodigo
+              rotulo={configurado ? 'Novo código' : 'Código de 4 dígitos'}
+              valor={novo}
+              aoMudar={(v) => {
+                setNovo(v);
+                setErro(null);
+              }}
+              erro={false}
+            />
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <BotaoDeAcao
+              rotulo={etapa === 'trocar' ? 'Guardar código' : 'Confirmar remoção'}
+              aoTocar={() => void (etapa === 'trocar' ? trocar() : remover())}
+            />
+            <BotaoDeAcao rotulo="Cancelar" aoTocar={parar} />
+          </div>
+
+          {erro && (
+            <p className="text-sm font-bold" style={{ color: 'var(--color-urgencia)' }}>
+              {erro}
+            </p>
+          )}
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
           <BotaoDeAcao
             rotulo={configurado ? 'Trocar código' : 'Criar código'}
-            aoTocar={() => setEditando(true)}
+            aoTocar={() => setEtapa('trocar')}
           />
           {configurado && (
-            <BotaoDeAcao
-              rotulo="Remover código"
-              aoTocar={() => {
-                removerPin();
-                setConfigurado(false);
-              }}
-            />
+            <BotaoDeAcao rotulo="Remover código" aoTocar={() => setEtapa('remover')} />
           )}
         </div>
       )}
@@ -247,6 +291,24 @@ function TravaDeAcesso() {
 function CopiaDeSeguranca() {
   const arquivo = useRef<HTMLInputElement>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // O backup carrega nome, idade, laudo e foto das crianças: exportar sem
+  // passar pelo código seria a porta dos fundos da trava.
+  const [liberado, setLiberado] = useState(() => estaDestrancado());
+  const [codigo, setCodigo] = useState('');
+  const [erro, setErro] = useState(false);
+
+  const destravar = async (valor: string) => {
+    setCodigo(valor);
+    setErro(false);
+    if (valor.length < 4) return;
+    if (await conferirPin(valor)) {
+      setLiberado(true);
+      setCodigo('');
+      return;
+    }
+    setErro(true);
+    setCodigo('');
+  };
 
   const exportarTudo = async () => {
     const backup = await montarBackup();
@@ -280,11 +342,31 @@ function CopiaDeSeguranca() {
       >
         Cópia de segurança
       </h3>
-      <div className="flex flex-wrap gap-2">
-        <BotaoDeAcao rotulo="Exportar tudo (JSON)" aoTocar={() => void exportarTudo()} />
-        <BotaoDeAcao rotulo="Exportar fichas (CSV)" aoTocar={exportarCsv} />
-        <BotaoDeAcao rotulo="Restaurar backup" aoTocar={() => arquivo.current?.click()} />
-      </div>
+
+      {liberado ? (
+        <div className="flex flex-wrap gap-2">
+          <BotaoDeAcao rotulo="Exportar tudo (JSON)" aoTocar={() => void exportarTudo()} />
+          <BotaoDeAcao rotulo="Exportar fichas (CSV)" aoTocar={exportarCsv} />
+          <BotaoDeAcao rotulo="Restaurar backup" aoTocar={() => arquivo.current?.click()} />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <CampoDeCodigo
+            rotulo="Código do voluntário"
+            valor={codigo}
+            aoMudar={(v) => void destravar(v)}
+            erro={erro}
+          />
+          <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+            O backup leva nome, idade, laudo e foto das crianças.
+          </p>
+          {erro && (
+            <p className="text-sm font-bold" style={{ color: 'var(--color-urgencia)' }}>
+              Código errado.
+            </p>
+          )}
+        </div>
+      )}
       <input
         ref={arquivo}
         type="file"
@@ -306,6 +388,37 @@ function CopiaDeSeguranca() {
         </p>
       )}
     </section>
+  );
+}
+
+function CampoDeCodigo({
+  rotulo,
+  valor,
+  aoMudar,
+  erro,
+}: {
+  rotulo: string;
+  valor: string;
+  aoMudar: (valor: string) => void;
+  erro: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-3">
+      <span className="text-base font-bold">{rotulo}</span>
+      <input
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={4}
+        value={valor}
+        onChange={(e) => aoMudar(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        className="min-h-12 w-28 rounded-2xl border-2 text-center text-xl font-extrabold tracking-[0.3em]"
+        style={{
+          borderColor: erro ? 'var(--color-urgencia)' : 'var(--color-linha)',
+          background: 'var(--color-fundo)',
+        }}
+      />
+    </label>
   );
 }
 
