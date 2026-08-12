@@ -1,3 +1,4 @@
+import { enfileirar } from './fila';
 import type { Ficha } from './ficha';
 
 /**
@@ -32,7 +33,21 @@ function gravar(fichas: Record<string, Ficha>) {
 
 /** Fichas salvas, da mais recente para a mais antiga. */
 export function listarFichas(): Ficha[] {
-  return Object.values(ler()).sort((a, b) => b.data - a.data);
+  return Object.values(ler())
+    .filter((ficha) => !ficha.apagadoEm)
+    .sort((a, b) => b.data - a.data);
+}
+
+/** Inclui as apagadas: a sincronização precisa propagar a exclusão. */
+export const listarFichasComApagadas = (): Ficha[] => Object.values(ler());
+
+export const fichaPorId = (id: string): Ficha | undefined => ler()[id];
+
+/** Grava vindo da nuvem, sem reenfileirar: senão os dois lados se empurram. */
+export function guardarFichaDaNuvem(ficha: Ficha): void {
+  const fichas = ler();
+  fichas[ficha.id] = ficha;
+  gravar(fichas);
 }
 
 export const diaDaFicha = (ficha: Ficha) => new Date(ficha.data).toISOString().slice(0, 10);
@@ -65,21 +80,31 @@ export function diasComFicha(fichas: Ficha[]): string[] {
 /** Apaga o cadastro junto com as fichas dele — o botão não pode mentir. */
 export function apagarFichasDoPerfil(perfilId: string): number {
   const fichas = ler();
-  const alvos = Object.values(fichas).filter((ficha) => ficha.perfilId === perfilId);
-  alvos.forEach((ficha) => delete fichas[ficha.id]);
+  const alvos = Object.values(fichas).filter(
+    (ficha) => ficha.perfilId === perfilId && !ficha.apagadoEm,
+  );
+  alvos.forEach((ficha) => {
+    fichas[ficha.id] = { ...ficha, apagadoEm: Date.now(), atualizadoEm: Date.now() };
+    enfileirar('fichas', ficha.id);
+  });
   gravar(fichas);
   return alvos.length;
 }
 
 export function salvarFicha(ficha: Ficha): Ficha {
   const fichas = ler();
-  fichas[ficha.id] = ficha;
+  const salva = { ...ficha, atualizadoEm: Date.now() };
+  fichas[ficha.id] = salva;
   gravar(fichas);
-  return ficha;
+  enfileirar('fichas', ficha.id);
+  return salva;
 }
 
 export function apagarFicha(id: string): void {
   const fichas = ler();
-  delete fichas[id];
+  const ficha = fichas[id];
+  if (!ficha) return;
+  fichas[id] = { ...ficha, apagadoEm: Date.now(), atualizadoEm: Date.now() };
   gravar(fichas);
+  enfileirar('fichas', id);
 }
