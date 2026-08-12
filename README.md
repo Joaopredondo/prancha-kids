@@ -37,6 +37,30 @@ Cores (código Fitzgerald, padrão em CAA):
 verde = ações · laranja = coisas · azul = como estou · rosa = social ·
 amarelo = pessoas · vermelho = parar/não.
 
+## Agora e depois
+
+Quadro de transição portado do Lume (`src/dados/rotina.ts`, `src/dados/figurinhas.ts`,
+`src/components/AgoraEDepois.tsx`). A prancha diz o que a criança quer; este quadro
+diz o que vem agora e o que vem depois — a troca de atividade é onde a crise
+costuma acontecer.
+
+Mesma lógica do Lume: as 13 figurinhas, a rotina padrão do culto, "não passa do
+último passo", soltar em DEPOIS além do fim estende a fila, e o modo criança
+esconde a bandeja (sair dele exige segurar 3 segundos).
+
+Diferenças, todas de interface:
+
+- **Empilha no celular**, duas colunas a partir de `sm`. No Lume o quadro é
+  `absolute inset-0` com largura calculada e no celular metade ficava fora da tela.
+- **Sem arrastar**: só tocar a figurinha e tocar o espaço. Era o caminho
+  acessível que o Lume já tinha, e é o único que não quebra no toque.
+- Emoji e cor por classe gramatical no lugar das silhuetas sobre fundo preto.
+  Quando a figurinha equivale a um card (`cardId`), usa a mesma foto que a
+  criança já conhece da prancha.
+
+A rotina fica salva em `localStorage` — é a mesma toda semana. O passo atual
+também é salvo, mas zera quando a data muda.
+
 ## Ficha do culto
 
 Portada do projeto Lume (`src/dados/ficha.ts`, `src/components/Ficha.tsx`), com os

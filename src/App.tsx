@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import logo from './assets/ipi.png';
+import { AgoraEDepois } from './components/AgoraEDepois';
 import { Board } from './components/Board';
 import { Ficha } from './components/Ficha';
 import { Footer } from './components/Footer';
@@ -80,15 +81,16 @@ export default function App() {
           definir('categoria', aba);
           setVista('prancha');
         }}
+        onAgora={() => setVista('agora')}
         onFicha={() => setVista('ficha')}
       />
 
       <main className="flex-1">
-        {vista === 'prancha' ? (
+        {vista === 'prancha' && (
           <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
-        ) : (
-          <Ficha />
         )}
+        {vista === 'agora' && <AgoraEDepois som={prefs.som} />}
+        {vista === 'ficha' && <Ficha />}
       </main>
 
       <Footer />

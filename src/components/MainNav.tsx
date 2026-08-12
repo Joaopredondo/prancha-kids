@@ -5,12 +5,13 @@ import type { Categoria } from '../types';
 import { BotaoSegurar } from './BotaoSegurar';
 
 export type Aba = Categoria | 'tudo';
-export type Vista = 'prancha' | 'ficha';
+export type Vista = 'prancha' | 'agora' | 'ficha';
 
 interface Props {
   vista: Vista;
   aba: Aba;
   onAba: (aba: Aba) => void;
+  onAgora: () => void;
   onFicha: () => void;
 }
 
@@ -24,7 +25,7 @@ const ABAS: { id: Aba; label: string; emoji: string }[] = [
  * ao lado, como irmã, e não dentro da prancha — são dois usos diferentes, um da
  * criança e outro do voluntário.
  */
-export function MainNav({ vista, aba, onAba, onFicha }: Props) {
+export function MainNav({ vista, aba, onAba, onAgora, onFicha }: Props) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
 
@@ -48,7 +49,10 @@ export function MainNav({ vista, aba, onAba, onFicha }: Props) {
   const naPrancha = vista === 'prancha';
 
   return (
-    <nav aria-label="Menu principal" className="flex gap-2 px-3 pb-3 sm:px-4">
+    <nav
+      aria-label="Menu principal"
+      className="flex snap-x gap-2 overflow-x-auto px-3 pb-3 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       <div ref={caixa} className="relative">
         <button
           type="button"
@@ -119,6 +123,23 @@ export function MainNav({ vista, aba, onAba, onFicha }: Props) {
           )}
         </AnimatePresence>
       </div>
+
+      <button
+        type="button"
+        onClick={onAgora}
+        aria-current={vista === 'agora' ? 'page' : undefined}
+        className="flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border-2 px-4 py-2.5 text-base font-bold"
+        style={{
+          borderColor: vista === 'agora' ? 'transparent' : 'var(--color-linha)',
+          background: vista === 'agora' ? 'var(--color-texto)' : 'var(--color-superficie)',
+          color: vista === 'agora' ? 'var(--color-fundo)' : 'var(--color-texto-suave)',
+        }}
+      >
+        <span aria-hidden="true" className="text-lg">
+          ⏭️
+        </span>
+        Agora e depois
+      </button>
 
       <BotaoSegurar rotulo="Ficha do culto" ativo={vista === 'ficha'} aoCompletar={onFicha} />
     </nav>

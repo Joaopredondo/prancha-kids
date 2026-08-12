@@ -44,6 +44,16 @@ function falar(texto: string) {
   speechSynthesis.speak(fala);
 }
 
+/**
+ * Fala um texto avulso — usado pelo quadro "Agora e depois", que anuncia a
+ * troca de atividade e não tem card correspondente para cada figurinha.
+ */
+export function falarTexto(texto: string) {
+  Howler.stop();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  falar(texto);
+}
+
 function semSomDisponivel(card: Card) {
   semArquivo.add(card.id);
   sons.delete(card.id);
