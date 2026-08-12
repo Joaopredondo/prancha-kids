@@ -5,10 +5,13 @@ import {
   ESTADOS,
   HORARIOS,
   INTERACOES,
+  MARCACOES,
   PERTENCES,
   RECURSOS,
   ROTULOS,
+  ROTULOS_DE_MARCACAO,
   SAIDAS,
+  marcacoesEmTexto,
   alternarMultiplo,
   alternarUnico,
   fichaVazia,
@@ -294,6 +297,78 @@ export function Ficha() {
           aoMudar={(v) => mudar('interesses', v)}
           dica="o que prendeu a atenção hoje"
         />
+      </Secao>
+
+      <Secao titulo="Durante o culto — um toque carimba a hora">
+        <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+          Para registrar na hora, sem digitar. No fim, "Passar para a descrição" transforma
+          isso em texto.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {MARCACOES.map((tipo) => (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() =>
+                mudar('marcacoes', [...(ficha.marcacoes ?? []), { hora: Date.now(), tipo }])
+              }
+              className="min-h-12 rounded-2xl border-2 px-4 text-base font-bold"
+              style={{ borderColor: 'var(--color-linha)' }}
+            >
+              {ROTULOS_DE_MARCACAO[tipo]}
+            </button>
+          ))}
+        </div>
+
+        {(ficha.marcacoes ?? []).length > 0 && (
+          <>
+            <ul className="flex flex-col gap-2">
+              {(ficha.marcacoes ?? []).map((marcacao, i) => (
+                <li
+                  key={`${marcacao.hora}-${i}`}
+                  className="flex items-center justify-between gap-2 rounded-2xl border-2 px-3 py-2"
+                  style={{ borderColor: 'var(--color-linha)' }}
+                >
+                  <span className="text-base font-bold tabular-nums">
+                    {new Date(marcacao.hora).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}
+                    <span className="font-normal">{ROTULOS_DE_MARCACAO[marcacao.tipo]}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      mudar(
+                        'marcacoes',
+                        (ficha.marcacoes ?? []).filter((_, indice) => indice !== i),
+                      )
+                    }
+                    aria-label={`Tirar ${ROTULOS_DE_MARCACAO[marcacao.tipo]} das ${new Date(
+                      marcacao.hora,
+                    ).toLocaleTimeString('pt-BR')}`}
+                    className="size-11 rounded-xl border-2 text-lg font-bold"
+                    style={{ borderColor: 'var(--color-linha)', color: 'var(--color-urgencia)' }}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              type="button"
+              onClick={() => {
+                const texto = marcacoesEmTexto(ficha.marcacoes ?? []);
+                mudar('descricao', ficha.descricao ? `${ficha.descricao}\n${texto}` : texto);
+              }}
+              className="min-h-12 self-start rounded-2xl border-2 px-4 text-base font-bold"
+              style={{ borderColor: 'var(--color-acao)', color: 'var(--color-acao)' }}
+            >
+              Passar para a descrição
+            </button>
+          </>
+        )}
       </Secao>
 
       <Secao titulo="4 · Manejo do voluntário e descrição de comportamento">

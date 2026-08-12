@@ -35,6 +35,21 @@ export type Recurso = (typeof RECURSOS)[number];
 export const ALIMENTACOES = ['aceitou', 'agua', 'recusou'] as const;
 export type Alimentacao = (typeof ALIMENTACOES)[number];
 
+/** Carimbo de hora feito com um toque durante o culto. */
+export type Marcacao = { hora: number; tipo: TipoDeMarcacao };
+
+export const MARCACOES = ['crise', 'acalmou', 'saiu', 'voltou', 'lanche', 'banheiro'] as const;
+export type TipoDeMarcacao = (typeof MARCACOES)[number];
+
+export const ROTULOS_DE_MARCACAO: Record<TipoDeMarcacao, string> = {
+  crise: 'Crise',
+  acalmou: 'Acalmou',
+  saiu: 'Saiu da sala',
+  voltou: 'Voltou',
+  lanche: 'Lanche',
+  banheiro: 'Banheiro',
+};
+
 export type Ficha = {
   id: string;
   data: number;
@@ -63,6 +78,9 @@ export type Ficha = {
 
   assinatura: string;
   retiradaPor: string;
+
+  /** Linha do tempo do culto, carimbada com um toque. */
+  marcacoes: Marcacao[];
 };
 
 export const ROTULOS = {
@@ -135,6 +153,7 @@ export function fichaVazia(data = Date.now(), perfilId: string | null = null): F
     descricao: '',
     assinatura: '',
     retiradaPor: '',
+    marcacoes: [],
   };
 }
 
@@ -167,4 +186,20 @@ export function alternarMultiplo<T>(atuais: T[], escolha: T): T[] {
   return atuais.includes(escolha)
     ? atuais.filter((item) => item !== escolha)
     : [...atuais, escolha];
+}
+
+/**
+ * Transforma a linha do tempo em texto corrido, para o voluntário colar na
+ * descrição do comportamento em vez de escrever de memória depois do culto.
+ */
+export function marcacoesEmTexto(marcacoes: Marcacao[]): string {
+  return marcacoes
+    .map(
+      (marcacao) =>
+        `${new Date(marcacao.hora).toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })} ${ROTULOS_DE_MARCACAO[marcacao.tipo].toLowerCase()}`,
+    )
+    .join('; ');
 }
