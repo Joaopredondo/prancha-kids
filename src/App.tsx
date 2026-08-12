@@ -4,6 +4,7 @@ import { AgoraEDepois } from './components/AgoraEDepois';
 import { Board } from './components/Board';
 import { Ficha } from './components/Ficha';
 import { Footer } from './components/Footer';
+import { Frequencia } from './components/Frequencia';
 import { MainNav, type Vista } from './components/MainNav';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
@@ -83,6 +84,7 @@ export default function App() {
         }}
         onAgora={() => setVista('agora')}
         onFicha={() => setVista('ficha')}
+        onFrequencia={() => setVista('frequencia')}
       />
 
       <main className="flex-1">
@@ -91,6 +93,7 @@ export default function App() {
         )}
         {vista === 'agora' && <AgoraEDepois som={prefs.som} />}
         {vista === 'ficha' && <Ficha />}
+        {vista === 'frequencia' && <Frequencia />}
       </main>
 
       <Footer />
