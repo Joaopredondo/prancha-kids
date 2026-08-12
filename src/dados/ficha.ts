@@ -38,6 +38,8 @@ export type Alimentacao = (typeof ALIMENTACOES)[number];
 export type Ficha = {
   id: string;
   data: number;
+  /** Criança cadastrada em `perfis.ts`. `null` nas fichas soltas, sem cadastro. */
+  perfilId: string | null;
 
   nome: string;
   idade: string;
@@ -109,10 +111,11 @@ export const ROTULOS = {
 } as const;
 
 /** Zero da ficha: tudo em branco, nada pré-marcado. */
-export function fichaVazia(data = Date.now()): Ficha {
+export function fichaVazia(data = Date.now(), perfilId: string | null = null): Ficha {
   return {
     id: novoId(data),
     data,
+    perfilId,
     nome: '',
     idade: '',
     laudo: '',

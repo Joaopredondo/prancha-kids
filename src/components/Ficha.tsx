@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ALIMENTACOES,
   COMUNICACOES,
@@ -14,7 +14,17 @@ import {
   fichaVazia,
   type Ficha as TipoDaFicha,
 } from '../dados/ficha';
-import { apagarFicha, listarFichas, salvarFicha } from '../dados/fichas';
+import {
+  apagarFicha,
+  apagarFichasDoPerfil,
+  diasComFicha,
+  filtrarFichas,
+  listarFichas,
+  salvarFicha,
+  type Filtro,
+} from '../dados/fichas';
+import { apagarPerfil, listarPerfis, perfilPorId, salvarPerfil, type Perfil } from '../dados/perfis';
+import { SeletorDeCrianca } from './SeletorDeCrianca';
 
 /**
  * Ficha de acompanhamento do culto, portada do Lume.
@@ -33,10 +43,17 @@ export function Ficha() {
   const [modo, setModo] = useState<'edicao' | 'leitura'>('edicao');
   const [salvaEm, setSalvaEm] = useState<number | null>(null);
   const [anteriores, setAnteriores] = useState<TipoDaFicha[]>([]);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
+  const [filtro, setFiltro] = useState<Filtro>({ perfilId: null, dia: null, horario: null });
 
-  useEffect(() => setAnteriores(listarFichas()), []);
+  useEffect(() => {
+    setAnteriores(listarFichas());
+    setPerfis(listarPerfis());
+  }, []);
 
   const leitura = modo === 'leitura';
+  const listadas = useMemo(() => filtrarFichas(anteriores, filtro), [anteriores, filtro]);
+  const dias = useMemo(() => diasComFicha(anteriores), [anteriores]);
 
   const mudar = <C extends keyof TipoDaFicha>(campo: C, valor: TipoDaFicha[C]) =>
     setFicha((atual) => ({ ...atual, [campo]: valor }));
@@ -47,10 +64,36 @@ export function Ficha() {
     setAnteriores(listarFichas());
   };
 
-  const novaFicha = () => {
-    setFicha(fichaVazia());
+  /** Ficha nova já identificada com o cadastro da criança escolhida. */
+  const novaFicha = (perfilId: string | null = ficha.perfilId) => {
+    const perfil = perfilPorId(perfilId);
+    const nova = fichaVazia(Date.now(), perfil?.id ?? null);
+    setFicha(
+      perfil ? { ...nova, nome: perfil.nome, idade: perfil.idade, laudo: perfil.laudo } : nova,
+    );
     setModo('edicao');
     setSalvaEm(null);
+  };
+
+  /**
+   * Escolher a criança identifica a ficha em branco. Se a ficha aberta já foi
+   * salva, começa **outra** — trocar o dono de uma ficha gravada apagaria o
+   * atendimento da criança anterior.
+   */
+  const escolherCrianca = (perfilId: string | null) => {
+    const jaSalva = anteriores.some((salva) => salva.id === ficha.id);
+    if (leitura || jaSalva) {
+      novaFicha(perfilId);
+      return;
+    }
+    const perfil = perfilPorId(perfilId);
+    setFicha((atual) => ({
+      ...atual,
+      perfilId: perfil?.id ?? null,
+      nome: perfil?.nome ?? atual.nome,
+      idade: perfil?.idade ?? atual.idade,
+      laudo: perfil?.laudo ?? atual.laudo,
+    }));
   };
 
   /** Abrir uma ficha salva mostra primeiro em leitura: ninguém edita sem querer. */
@@ -84,6 +127,23 @@ export function Ficha() {
           </>
         )}
       </p>
+
+      <SeletorDeCrianca
+        perfis={perfis}
+        perfilAtivo={ficha.perfilId}
+        onEscolher={escolherCrianca}
+        onSalvar={(perfil) => {
+          salvarPerfil(perfil);
+          setPerfis(listarPerfis());
+        }}
+        onApagar={(perfil) => {
+          apagarFichasDoPerfil(perfil.id);
+          apagarPerfil(perfil.id);
+          setPerfis(listarPerfis());
+          setAnteriores(listarFichas());
+          if (ficha.perfilId === perfil.id) novaFicha(null);
+        }}
+      />
 
       {/* `fieldset disabled` desliga todos os campos de uma vez no modo leitura. */}
       <fieldset disabled={leitura} className="contents">
@@ -294,11 +354,13 @@ export function Ficha() {
         </button>
         <button
           type="button"
-          onClick={novaFicha}
+          onClick={() => novaFicha()}
           className="min-h-14 rounded-2xl border-2 px-6 text-base font-bold"
           style={{ borderColor: 'var(--color-linha)' }}
         >
-          Nova ficha
+          {perfilPorId(ficha.perfilId)
+            ? `Nova ficha para ${perfilPorId(ficha.perfilId)?.nome}`
+            : 'Nova ficha'}
         </button>
         {salvaEm && (
           <span className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
@@ -311,9 +373,48 @@ export function Ficha() {
           crianças. */}
       {anteriores.length > 0 && (
         <div className="print:hidden">
-        <Secao titulo={`Fichas salvas (${anteriores.length})`}>
+        <Secao titulo={`Fichas salvas (${listadas.length} de ${anteriores.length})`}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Selecao
+              rotulo="Criança"
+              valor={filtro.perfilId ?? ''}
+              aoMudar={(v) => setFiltro({ ...filtro, perfilId: v || null })}
+              opcoes={[
+                { valor: '', label: 'Todas' },
+                ...perfis.map((p) => ({ valor: p.id, label: p.nome || 'Sem nome' })),
+                { valor: 'sem-perfil', label: 'Sem cadastro' },
+              ]}
+            />
+            <Selecao
+              rotulo="Dia"
+              valor={filtro.dia ?? ''}
+              aoMudar={(v) => setFiltro({ ...filtro, dia: v || null })}
+              opcoes={[
+                { valor: '', label: 'Todos' },
+                ...dias.map((dia) => ({
+                  valor: dia,
+                  label: new Date(`${dia}T12:00`).toLocaleDateString('pt-BR'),
+                })),
+              ]}
+            />
+            <Selecao
+              rotulo="Culto"
+              valor={filtro.horario ?? ''}
+              aoMudar={(v) => setFiltro({ ...filtro, horario: v || null })}
+              opcoes={[
+                { valor: '', label: 'Todos' },
+                ...HORARIOS.map((h) => ({ valor: h, label: h })),
+              ]}
+            />
+          </div>
+
+          {listadas.length === 0 ? (
+            <p className="text-base" style={{ color: 'var(--color-texto-suave)' }}>
+              Nenhuma ficha com esse filtro.
+            </p>
+          ) : (
           <ul className="flex flex-col gap-2">
-            {anteriores.map((anterior) => (
+            {listadas.map((anterior) => (
               <li
                 key={anterior.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3"
@@ -364,10 +465,41 @@ export function Ficha() {
               </li>
             ))}
           </ul>
+          )}
         </Secao>
         </div>
       )}
     </div>
+  );
+}
+
+function Selecao({
+  rotulo,
+  valor,
+  aoMudar,
+  opcoes,
+}: {
+  rotulo: string;
+  valor: string;
+  aoMudar: (valor: string) => void;
+  opcoes: { valor: string; label: string }[];
+}) {
+  return (
+    <label className="block">
+      <span className="text-base font-bold">{rotulo}</span>
+      <select
+        value={valor}
+        onChange={(e) => aoMudar(e.target.value)}
+        className="mt-2 min-h-12 w-full rounded-2xl border-2 px-3 text-base"
+        style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+      >
+        {opcoes.map((opcao) => (
+          <option key={opcao.valor} value={opcao.valor}>
+            {opcao.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

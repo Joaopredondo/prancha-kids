@@ -35,6 +35,42 @@ export function listarFichas(): Ficha[] {
   return Object.values(ler()).sort((a, b) => b.data - a.data);
 }
 
+export const diaDaFicha = (ficha: Ficha) => new Date(ficha.data).toISOString().slice(0, 10);
+
+export type Filtro = {
+  /** `null` = todas as crianças; `'sem-perfil'` = fichas sem cadastro. */
+  perfilId: string | null;
+  /** `null` = todos os dias; senão `YYYY-MM-DD`. */
+  dia: string | null;
+  /** `null` = todos os cultos; senão o horário. */
+  horario: string | null;
+};
+
+export function filtrarFichas(fichas: Ficha[], filtro: Filtro): Ficha[] {
+  return fichas.filter((ficha) => {
+    if (filtro.perfilId === 'sem-perfil' && ficha.perfilId) return false;
+    if (filtro.perfilId && filtro.perfilId !== 'sem-perfil' && ficha.perfilId !== filtro.perfilId)
+      return false;
+    if (filtro.dia && diaDaFicha(ficha) !== filtro.dia) return false;
+    if (filtro.horario && ficha.horario !== filtro.horario) return false;
+    return true;
+  });
+}
+
+/** Dias que têm ficha, do mais recente para o mais antigo. */
+export function diasComFicha(fichas: Ficha[]): string[] {
+  return [...new Set(fichas.map(diaDaFicha))].sort().reverse();
+}
+
+/** Apaga o cadastro junto com as fichas dele — o botão não pode mentir. */
+export function apagarFichasDoPerfil(perfilId: string): number {
+  const fichas = ler();
+  const alvos = Object.values(fichas).filter((ficha) => ficha.perfilId === perfilId);
+  alvos.forEach((ficha) => delete fichas[ficha.id]);
+  gravar(fichas);
+  return alvos.length;
+}
+
 export function salvarFicha(ficha: Ficha): Ficha {
   const fichas = ler();
   fichas[ficha.id] = ficha;
