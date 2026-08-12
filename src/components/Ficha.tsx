@@ -14,7 +14,7 @@ import {
   fichaVazia,
   type Ficha as TipoDaFicha,
 } from '../dados/ficha';
-import { apagarFicha, fichaDeHoje, listarFichas, salvarFicha } from '../dados/fichas';
+import { apagarFicha, listarFichas, salvarFicha } from '../dados/fichas';
 
 /**
  * Ficha de acompanhamento do culto, portada do Lume.
@@ -30,13 +30,13 @@ import { apagarFicha, fichaDeHoje, listarFichas, salvarFicha } from '../dados/fi
  */
 export function Ficha() {
   const [ficha, setFicha] = useState<TipoDaFicha>(() => fichaVazia());
+  const [modo, setModo] = useState<'edicao' | 'leitura'>('edicao');
   const [salvaEm, setSalvaEm] = useState<number | null>(null);
   const [anteriores, setAnteriores] = useState<TipoDaFicha[]>([]);
 
-  useEffect(() => {
-    setFicha(fichaDeHoje());
-    setAnteriores(listarFichas());
-  }, []);
+  useEffect(() => setAnteriores(listarFichas()), []);
+
+  const leitura = modo === 'leitura';
 
   const mudar = <C extends keyof TipoDaFicha>(campo: C, valor: TipoDaFicha[C]) =>
     setFicha((atual) => ({ ...atual, [campo]: valor }));
@@ -49,11 +49,14 @@ export function Ficha() {
 
   const novaFicha = () => {
     setFicha(fichaVazia());
+    setModo('edicao');
     setSalvaEm(null);
   };
 
+  /** Abrir uma ficha salva mostra primeiro em leitura: ninguém edita sem querer. */
   const abrir = (anterior: TipoDaFicha) => {
     setFicha(anterior);
+    setModo('leitura');
     setSalvaEm(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -67,10 +70,23 @@ export function Ficha() {
   return (
     <div className="flex flex-col gap-5 px-3 pb-6 sm:px-4">
       <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-        Ficha de {new Date(ficha.data).toLocaleDateString('pt-BR')}. Uma por criança por dia —
-        reabrir continua de onde parou. Nada aqui é obrigatório. Fica só neste aparelho.
+        {leitura ? (
+          <>
+            Visualizando a ficha de <strong>{ficha.nome || 'sem nome'}</strong>, de{' '}
+            {new Date(ficha.data).toLocaleDateString('pt-BR')}. Somente leitura — toque em
+            "Editar" para mudar alguma coisa.
+          </>
+        ) : (
+          <>
+            Ficha de {new Date(ficha.data).toLocaleDateString('pt-BR')}. Nada aqui é obrigatório.
+            Fica só neste aparelho. Cada "Nova ficha" é uma ficha separada — salvar não
+            substitui as anteriores.
+          </>
+        )}
       </p>
 
+      {/* `fieldset disabled` desliga todos os campos de uma vez no modo leitura. */}
+      <fieldset disabled={leitura} className="contents">
       <Secao titulo="1 · Identificação, culto e segurança">
         <Texto
           rotulo="Nome da criança"
@@ -246,16 +262,28 @@ export function Ficha() {
           />
         </div>
       </Secao>
+      </fieldset>
 
       <div className="flex flex-wrap items-center gap-3 print:hidden">
-        <button
-          type="button"
-          onClick={guardar}
-          className="min-h-14 rounded-2xl px-6 text-base font-extrabold"
-          style={{ background: 'var(--color-acao)', color: '#ffffff' }}
-        >
-          Salvar ficha
-        </button>
+        {leitura ? (
+          <button
+            type="button"
+            onClick={() => setModo('edicao')}
+            className="min-h-14 rounded-2xl px-6 text-base font-extrabold"
+            style={{ background: 'var(--color-acao)', color: '#ffffff' }}
+          >
+            Editar
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={guardar}
+            className="min-h-14 rounded-2xl px-6 text-base font-extrabold"
+            style={{ background: 'var(--color-acao)', color: '#ffffff' }}
+          >
+            Salvar ficha
+          </button>
+        )}
         <button
           type="button"
           onClick={() => window.print()}
@@ -279,14 +307,20 @@ export function Ficha() {
         )}
       </div>
 
+      {/* Não vai para o papel: imprimir uma ficha não pode listar as das outras
+          crianças. */}
       {anteriores.length > 0 && (
-        <Secao titulo="Fichas salvas">
+        <div className="print:hidden">
+        <Secao titulo={`Fichas salvas (${anteriores.length})`}>
           <ul className="flex flex-col gap-2">
-            {anteriores.slice(0, 20).map((anterior) => (
+            {anteriores.map((anterior) => (
               <li
                 key={anterior.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3"
-                style={{ borderColor: 'var(--color-linha)' }}
+                style={{
+                  borderColor:
+                    anterior.id === ficha.id ? 'var(--color-acao)' : 'var(--color-linha)',
+                }}
               >
                 <button
                   type="button"
@@ -299,23 +333,39 @@ export function Ficha() {
                     style={{ color: 'var(--color-texto-suave)' }}
                   >
                     {new Date(anterior.data).toLocaleDateString('pt-BR')}
-                    {anterior.horario && ` · ${anterior.horario}`}
+                    {' às '}
+                    {new Date(anterior.data).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                    {anterior.horario && ` · culto ${anterior.horario}`}
                     {anterior.estado && ` · ${ROTULOS.estado[anterior.estado]}`}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => remover(anterior.id)}
-                  aria-label={`Apagar ficha de ${anterior.nome || 'sem nome'}`}
-                  className="rounded-xl border-2 px-3 py-2 text-sm font-bold print:hidden"
-                  style={{ borderColor: 'var(--color-linha)', color: 'var(--color-urgencia)' }}
-                >
-                  Apagar
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => abrir(anterior)}
+                    className="rounded-xl border-2 px-3 py-2 text-sm font-bold"
+                    style={{ borderColor: 'var(--color-linha)' }}
+                  >
+                    Ver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remover(anterior.id)}
+                    aria-label={`Apagar ficha de ${anterior.nome || 'sem nome'}`}
+                    className="rounded-xl border-2 px-3 py-2 text-sm font-bold"
+                    style={{ borderColor: 'var(--color-linha)', color: 'var(--color-urgencia)' }}
+                  >
+                    Apagar
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         </Secao>
+        </div>
       )}
     </div>
   );

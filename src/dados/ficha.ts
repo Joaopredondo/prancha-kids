@@ -111,7 +111,7 @@ export const ROTULOS = {
 /** Zero da ficha: tudo em branco, nada pré-marcado. */
 export function fichaVazia(data = Date.now()): Ficha {
   return {
-    id: chaveDaFicha('', data),
+    id: novoId(data),
     data,
     nome: '',
     idade: '',
@@ -136,20 +136,16 @@ export function fichaVazia(data = Date.now()): Ficha {
 }
 
 /**
- * Uma ficha por criança por dia. A chave é o par nome+data, para o voluntário
- * reabrir e completar durante o culto em vez de criar ficha nova a cada toque.
+ * Identificador próprio, sorteado na criação e **nunca recalculado**.
+ *
+ * Antes a chave era `nome:dia`, e isso destruía dado: trocar o nome para
+ * atender a próxima criança movia a ficha de chave e apagava a anterior, e
+ * duas crianças de mesmo nome no mesmo dia colidiam. Nome é conteúdo, não
+ * chave.
  */
-export function chaveDaFicha(nome: string, data: number): string {
+export function novoId(data = Date.now()): string {
   const dia = new Date(data).toISOString().slice(0, 10);
-  const identificador =
-    nome
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'sem-nome';
-  return `${identificador}:${dia}`;
+  return `${dia}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /**
