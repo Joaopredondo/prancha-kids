@@ -40,21 +40,24 @@ export function voltar(estado: EstadoDaRotina): EstadoDaRotina {
   return { ...estado, indice: Math.max(0, estado.indice - 1) };
 }
 
-/** Troca a figurinha de um dos dois espaços do quadro. */
-export function colocar(
-  estado: EstadoDaRotina,
-  id: string,
-  espaco: 'agora' | 'depois',
-): EstadoDaRotina {
-  const alvo = espaco === 'agora' ? estado.indice : estado.indice + 1;
+/** Acrescenta um passo no fim da fila. */
+export function adicionar(estado: EstadoDaRotina, id: string): EstadoDaRotina {
+  return { ...estado, rotina: [...estado.rotina, id] };
+}
+
+/** Sobe ou desce um passo de posição, sem sair dos limites da fila. */
+export function mover(estado: EstadoDaRotina, posicao: number, direcao: -1 | 1): EstadoDaRotina {
+  const destino = posicao + direcao;
+  if (destino < 0 || destino >= estado.rotina.length) return estado;
+
   const rotina = [...estado.rotina];
-
-  // Soltar em "depois" quando não existe próximo passo estende a fila, em vez
-  // de perder o gesto: é como o voluntário monta a rotina no quadro físico.
-  if (alvo >= rotina.length) rotina.push(id);
-  else rotina[alvo] = id;
-
+  [rotina[posicao], rotina[destino]] = [rotina[destino], rotina[posicao]];
   return { ...estado, rotina };
+}
+
+/** Pula direto para um passo — o gesto que se espera ao tocar na faixa. */
+export function irPara(estado: EstadoDaRotina, posicao: number): EstadoDaRotina {
+  return { ...estado, indice: Math.min(Math.max(0, posicao), estado.rotina.length - 1) };
 }
 
 /** Remove um passo da fila. Não deixa a rotina ficar vazia. */
