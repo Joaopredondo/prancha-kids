@@ -338,7 +338,9 @@ function MontarRotina({
         <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--color-texto-suave)' }}>
           Tocar acrescenta no fim
         </h2>
-        <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Grade que quebra linha em vez de fileira rolável: com a barra de
+            rolagem escondida, nada avisava que havia figurinha fora da tela. */}
+        <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2">
           {FIGURINHAS.map((figurinha) => (
             <button
               key={figurinha.id}
@@ -346,7 +348,7 @@ function MontarRotina({
               data-classe={figurinha.classe}
               onClick={() => aoAdicionar(figurinha.id)}
               aria-label={`Acrescentar ${figurinha.nome} à rotina`}
-              className="grid w-24 shrink-0 snap-start grid-rows-[2.25rem_2.5rem] place-items-center gap-1 rounded-2xl border-[3px] p-2"
+              className="grid grid-rows-[2.25rem_2.5rem] place-items-center gap-1 rounded-2xl border-[3px] p-2"
               style={{ borderColor: 'var(--borda)', background: 'var(--tinta)' }}
             >
               <span aria-hidden="true" className="grid place-items-center text-3xl leading-none">
