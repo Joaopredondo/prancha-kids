@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { convidar, entrar, sair, useConta } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
+import { useSincronizacao } from '../hooks/useSincronizacao';
 
 /**
  * Conta do voluntário, dentro das Configurações.
@@ -11,6 +12,9 @@ import { temNuvem } from '../dados/supabase';
  */
 export function Conta() {
   const { carregando, email, vinculo, recarregar } = useConta();
+  const { pendentes, ocupado, ultimo, sincronizarAgora } = useSincronizacao(
+    vinculo?.ministerioId ?? null,
+  );
   const [entrando, setEntrando] = useState(false);
   const [dados, setDados] = useState({ email: '', senha: '' });
   const [convite, setConvite] = useState('');
@@ -97,6 +101,24 @@ export function Conta() {
           ? `${vinculo.ministerio} · ${vinculo.papel === 'coordenador' ? 'coordenação' : 'voluntário(a)'}`
           : 'Sem ministério vinculado — peça um convite à coordenação.'}
       </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Botao
+          rotulo={ocupado ? 'Sincronizando…' : 'Sincronizar agora'}
+          aoTocar={() => void sincronizarAgora()}
+        />
+        <span className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+          {pendentes > 0
+            ? `${pendentes} ${pendentes === 1 ? 'mudança pendente' : 'mudanças pendentes'}`
+            : 'tudo sincronizado'}
+        </span>
+      </div>
+
+      {ultimo?.erro && (
+        <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+          Última tentativa: {ultimo.erro} — o app tenta de novo sozinho.
+        </p>
+      )}
 
       {vinculo?.papel === 'coordenador' && (
         <div className="mt-3 flex flex-col gap-2">

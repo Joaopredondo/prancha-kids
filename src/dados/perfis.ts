@@ -1,3 +1,5 @@
+import { enfileirar } from './fila';
+
 /**
  * Cadastro das crianças atendidas.
  *
@@ -16,6 +18,10 @@ export type Perfil = {
   /** Foto opcional; o arquivo em si mora no IndexedDB (`arquivos.ts`). */
   temFoto?: boolean;
   criadoEm: number;
+  /** Carimbo da última mudança. É o que decide conflito na sincronização. */
+  atualizadoEm?: number;
+  /** Exclusão é lógica: apagar de verdade impediria propagar a exclusão. */
+  apagadoEm?: number | null;
 };
 
 const CHAVE = 'prancha-kids:perfis';
@@ -44,12 +50,27 @@ export function perfilVazio(): Perfil {
     idade: '',
     laudo: '',
     criadoEm: Date.now(),
+    atualizadoEm: Date.now(),
+    apagadoEm: null,
   };
 }
 
 /** Em ordem alfabética: é como o voluntário procura a criança. */
 export function listarPerfis(): Perfil[] {
-  return Object.values(ler()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  return Object.values(ler())
+    .filter((perfil) => !perfil.apagadoEm)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+/** Inclui os apagados: a sincronização precisa propagar a exclusão. */
+export const listarPerfisComApagados = (): Perfil[] => Object.values(ler());
+
+/** Grava vindo da nuvem, sem reenfileirar: senão os dois lados ficam se
+ * empurrando para sempre. */
+export function guardarPerfilDaNuvem(perfil: Perfil): void {
+  const perfis = ler();
+  perfis[perfil.id] = perfil;
+  gravar(perfis);
 }
 
 export function perfilPorId(id: string | null): Perfil | undefined {
@@ -58,13 +79,18 @@ export function perfilPorId(id: string | null): Perfil | undefined {
 
 export function salvarPerfil(perfil: Perfil): Perfil {
   const perfis = ler();
-  perfis[perfil.id] = perfil;
+  const salvo = { ...perfil, atualizadoEm: Date.now() };
+  perfis[perfil.id] = salvo;
   gravar(perfis);
-  return perfil;
+  enfileirar('criancas', perfil.id);
+  return salvo;
 }
 
 export function apagarPerfil(id: string): void {
   const perfis = ler();
-  delete perfis[id];
+  const perfil = perfis[id];
+  if (!perfil) return;
+  perfis[id] = { ...perfil, apagadoEm: Date.now(), atualizadoEm: Date.now() };
   gravar(perfis);
+  enfileirar('criancas', id);
 }

@@ -81,6 +81,11 @@ export type Ficha = {
 
   /** Linha do tempo do culto, carimbada com um toque. */
   marcacoes: Marcacao[];
+
+  /** Carimbo da última mudança; decide conflito na sincronização. */
+  atualizadoEm?: number;
+  /** Exclusão lógica: apagar de vez impediria propagar a exclusão. */
+  apagadoEm?: number | null;
 };
 
 export const ROTULOS = {
@@ -154,6 +159,8 @@ export function fichaVazia(data = Date.now(), perfilId: string | null = null): F
     assinatura: '',
     retiradaPor: '',
     marcacoes: [],
+    atualizadoEm: Date.now(),
+    apagadoEm: null,
   };
 }
 
