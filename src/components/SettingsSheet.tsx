@@ -9,6 +9,7 @@ import {
   type Backup,
 } from '../dados/backup';
 import { listarFichas } from '../dados/fichas';
+import { definirPin, removerPin, temPin } from '../dados/seguranca';
 import type { Classe, Prefs, TamanhoCard, Tema } from '../types';
 
 interface Props {
@@ -113,6 +114,8 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
               />
             </section>
 
+            <TravaDeAcesso />
+
             <CopiaDeSeguranca />
 
             <section>
@@ -135,6 +138,82 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar }: Props) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/**
+ * Código de 4 dígitos para a ficha e a frequência.
+ *
+ * Sem código, essas telas abrem segurando 3 segundos — o que barra a criança,
+ * não um adulto. Com código, barra também quem pega o tablet emprestado.
+ */
+function TravaDeAcesso() {
+  const [configurado, setConfigurado] = useState(() => temPin());
+  const [novo, setNovo] = useState('');
+  const [editando, setEditando] = useState(false);
+
+  const guardar = async () => {
+    if (novo.length !== 4) return;
+    await definirPin(novo);
+    setConfigurado(true);
+    setEditando(false);
+    setNovo('');
+  };
+
+  return (
+    <section className="mb-5">
+      <h3
+        className="mb-2 text-sm font-bold uppercase tracking-wide"
+        style={{ color: 'var(--color-texto-suave)' }}
+      >
+        Código do voluntário
+      </h3>
+
+      {editando ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={novo}
+            aria-label="Novo código de 4 dígitos"
+            onChange={(e) => setNovo(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            className="min-h-12 w-28 rounded-2xl border-2 text-center text-xl font-extrabold tracking-[0.3em]"
+            style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+          />
+          <BotaoDeAcao rotulo="Guardar código" aoTocar={() => void guardar()} />
+          <BotaoDeAcao
+            rotulo="Cancelar"
+            aoTocar={() => {
+              setEditando(false);
+              setNovo('');
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <BotaoDeAcao
+            rotulo={configurado ? 'Trocar código' : 'Criar código'}
+            aoTocar={() => setEditando(true)}
+          />
+          {configurado && (
+            <BotaoDeAcao
+              rotulo="Remover código"
+              aoTocar={() => {
+                removerPin();
+                setConfigurado(false);
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      <p className="mt-2 text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+        {configurado
+          ? 'A ficha e a frequência pedem o código uma vez por sessão. Fechar o app tranca de novo.'
+          : 'Sem código, a ficha abre só segurando 3 segundos — o que barra a criança, mas não um adulto.'}
+      </p>
+    </section>
   );
 }
 

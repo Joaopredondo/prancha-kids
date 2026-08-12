@@ -6,9 +6,11 @@ import { Ficha } from './components/Ficha';
 import { Footer } from './components/Footer';
 import { Frequencia } from './components/Frequencia';
 import { MainNav, type Vista } from './components/MainNav';
+import { PortaoDePin } from './components/PortaoDePin';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
 import { desbloquearAudio, prepararSons, tocarCard } from './audio/player';
+import { estaDestrancado } from './dados/seguranca';
 import { usePrefs } from './hooks/usePrefs';
 import { useTema } from './hooks/useTema';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -20,6 +22,7 @@ export default function App() {
   const [configAberta, setConfigAberta] = useState(false);
   // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
   const [vista, setVista] = useState<Vista>('prancha');
+  const [destrancado, setDestrancado] = useState(() => estaDestrancado());
   const timerRef = useRef<number | undefined>(undefined);
 
   useTema(prefs.tema);
@@ -92,8 +95,14 @@ export default function App() {
           <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
         )}
         {vista === 'agora' && <AgoraEDepois som={prefs.som} />}
-        {vista === 'ficha' && <Ficha />}
-        {vista === 'frequencia' && <Frequencia />}
+        {/* Ficha e frequência têm dado de saúde de menor: passam pelo código,
+            quando houver um configurado. */}
+        {(vista === 'ficha' || vista === 'frequencia') &&
+          (destrancado ? (
+            vista === 'ficha' ? <Ficha /> : <Frequencia />
+          ) : (
+            <PortaoDePin aoAbrir={() => setDestrancado(true)} />
+          ))}
       </main>
 
       <Footer />
