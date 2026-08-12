@@ -49,15 +49,24 @@ export function MainNav({ vista, aba, onAba, onAgora, onFicha }: Props) {
   const naPrancha = vista === 'prancha';
 
   return (
-    <nav
-      aria-label="Menu principal"
-      className="flex snap-x gap-2 overflow-x-auto px-3 pb-3 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
+    // Quebra de linha em vez de rolagem horizontal: com barra rolável o botão
+    // da ficha ficava cortado no celular, e ele precisa ser segurado por 3s.
+    <nav aria-label="Menu principal" className="flex flex-wrap gap-2 px-3 pb-3 sm:px-4">
       <div ref={caixa} className="relative">
         <button
           type="button"
-          onClick={() => setAberto((estava) => !estava)}
-          aria-expanded={aberto}
+          // Estando fora da prancha, o primeiro toque volta para ela — abrir o
+          // submenu e deixar a tela como estava parece que o botão não funciona.
+          // Já na prancha, o toque abre e fecha a lista de categorias.
+          onClick={() => {
+            if (!naPrancha) {
+              onAba(aba);
+              setAberto(false);
+              return;
+            }
+            setAberto((estava) => !estava);
+          }}
+          aria-expanded={naPrancha ? aberto : false}
           aria-haspopup="menu"
           aria-current={naPrancha ? 'page' : undefined}
           className="flex items-center gap-2 whitespace-nowrap rounded-full border-2 px-4 py-2.5 text-base font-bold"
