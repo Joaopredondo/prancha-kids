@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import logo from './assets/ipi.png';
 import { Board } from './components/Board';
-import { CategoryTabs } from './components/CategoryTabs';
+import { Ficha } from './components/Ficha';
 import { Footer } from './components/Footer';
+import { MainNav, type Vista } from './components/MainNav';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
 import { desbloquearAudio, prepararSons, tocarCard } from './audio/player';
@@ -15,6 +16,8 @@ export default function App() {
   const { prefs, definir } = usePrefs();
   const [cardAtivo, setCardAtivo] = useState<string | null>(null);
   const [configAberta, setConfigAberta] = useState(false);
+  // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
+  const [vista, setVista] = useState<Vista>('prancha');
   const timerRef = useRef<number | undefined>(undefined);
 
   useTema(prefs.tema);
@@ -70,13 +73,22 @@ export default function App() {
         </button>
       </header>
 
-      <CategoryTabs
-        atual={prefs.categoria}
-        onMudar={(aba) => definir('categoria', aba)}
+      <MainNav
+        vista={vista}
+        aba={prefs.categoria}
+        onAba={(aba) => {
+          definir('categoria', aba);
+          setVista('prancha');
+        }}
+        onFicha={() => setVista('ficha')}
       />
 
       <main className="flex-1">
-        <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
+        {vista === 'prancha' ? (
+          <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
+        ) : (
+          <Ficha />
+        )}
       </main>
 
       <Footer />

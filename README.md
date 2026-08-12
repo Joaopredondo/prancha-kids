@@ -37,6 +37,25 @@ Cores (código Fitzgerald, padrão em CAA):
 verde = ações · laranja = coisas · azul = como estou · rosa = social ·
 amarelo = pessoas · vermelho = parar/não.
 
+## Ficha do culto
+
+Portada do projeto Lume (`src/dados/ficha.ts`, `src/components/Ficha.tsx`), com os
+mesmos campos e a mesma ordem da folha impressa do ministério. Diferenças: o nome
+da criança é digitado na ficha (aqui não há perfil) e não existe o bloco
+"Preenchido pelo app" (o Prancha não registra sessão).
+
+- Abre segurando o botão **Ficha do culto por 3 segundos** — regra herdada do
+  Lume, para a criança não cair nela sem querer.
+- Uma ficha por criança por dia; reabrir continua de onde parou.
+- Salvar não valida nada: ficha pela metade vale mais que ficha em branco.
+- Escolha única **desmarca** ao tocar de novo, como no papel.
+- **Contém dado de saúde de menor** (nome, idade, laudo). Fica só no aparelho, em
+  `localStorage`, sem servidor. Quem empresta o tablet leva o histórico junto —
+  não há login separando um voluntário do outro. Apague as fichas antes de
+  repassar o aparelho.
+- "Imprimir / PDF" usa a impressão do navegador; o CSS de impressão esconde
+  cabeçalho, menu e rodapé e força fundo claro.
+
 ## Áudio
 
 O app toca `public/audio/{id}.mp3` quando o arquivo existe e cai para a voz do

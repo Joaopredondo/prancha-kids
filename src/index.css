@@ -99,6 +99,30 @@
 [data-tamanho='m'] { --card-min: clamp(6rem, 28vw, 10rem); }
 [data-tamanho='g'] { --card-min: clamp(8rem, 42vw, 14rem); }
 
+/* Impressão da ficha do culto: só o formulário, sempre em fundo claro. */
+@media print {
+  :root,
+  :root[data-tema='escuro'] {
+    color-scheme: light;
+    --color-fundo: #ffffff;
+    --color-superficie: #ffffff;
+    --color-texto: #000000;
+    --color-texto-suave: #444444;
+    --color-linha: #999999;
+    --sombra-card: none;
+  }
+
+  header,
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  section {
+    break-inside: avoid;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
