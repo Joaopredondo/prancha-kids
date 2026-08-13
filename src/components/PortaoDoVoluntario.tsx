@@ -76,10 +76,11 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
   };
 
   return (
-    <div className="grid min-h-full gap-0 lg:grid-cols-2">
+    // Ocupa a janela inteira: aqui não existe cabeçalho nem menu do app.
+    <div className="grid min-h-dvh gap-0 lg:grid-cols-2">
       {/* Painel de identidade. No celular vira uma faixa curta no topo. */}
       <aside
-        className="flex flex-col justify-center gap-6 px-6 py-8 lg:px-10 lg:py-14"
+        className="flex flex-col justify-center gap-6 px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))] lg:px-10 lg:py-14"
         style={{
           background:
             'linear-gradient(160deg, color-mix(in oklab, var(--color-coisa) 14%, var(--color-fundo)), var(--color-fundo))',
@@ -120,7 +121,7 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
       </aside>
 
       {/* Formulário. */}
-      <main className="flex items-center justify-center px-4 py-8 lg:px-10">
+      <main className="flex items-center justify-center px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 lg:px-10">
         <motion.div
           initial={semMovimento ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -256,7 +257,7 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
               className="min-h-12 cursor-pointer self-start rounded-full px-1 text-base font-bold underline underline-offset-4"
               style={{ color: 'var(--color-texto-suave)' }}
             >
-              Voltar para a prancha
+              ← Voltar para a prancha
             </button>
           )}
         </motion.div>
