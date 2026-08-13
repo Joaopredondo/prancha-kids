@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { convidar, entrar, sair, useConta } from '../dados/sessao';
+import { convidar, sair, useConta } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
 import { useSincronizacao } from '../hooks/useSincronizacao';
 
@@ -10,13 +10,11 @@ import { useSincronizacao } from '../hooks/useSincronizacao';
  * gravando no aparelho. A conta serve para, na fase seguinte, sincronizar as
  * fichas entre os voluntários.
  */
-export function Conta() {
+export function Conta({ onEntrar }: { onEntrar: () => void }) {
   const { carregando, email, vinculo, recarregar } = useConta();
   const { pendentes, ocupado, ultimo, sincronizarAgora, enviarTudo } = useSincronizacao(
     vinculo?.ministerioId ?? null,
   );
-  const [entrando, setEntrando] = useState(false);
-  const [dados, setDados] = useState({ email: '', senha: '' });
   const [convite, setConvite] = useState('');
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -44,51 +42,11 @@ export function Conta() {
   if (!email) {
     return (
       <Bloco>
-        {entrando ? (
-          <div className="flex flex-col gap-2">
-            <Campo
-              rotulo="E-mail"
-              tipo="email"
-              valor={dados.email}
-              aoMudar={(v) => setDados({ ...dados, email: v })}
-            />
-            <Campo
-              rotulo="Senha"
-              tipo="password"
-              valor={dados.senha}
-              aoMudar={(v) => setDados({ ...dados, senha: v })}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Botao
-                rotulo="Entrar"
-                destacado
-                aoTocar={async () => {
-                  const erro = await entrar(dados.email, dados.senha);
-                  setAviso(erro);
-                  if (!erro) {
-                    setEntrando(false);
-                    setDados({ email: '', senha: '' });
-                    recarregar();
-                  }
-                }}
-              />
-              <Botao rotulo="Cancelar" aoTocar={() => setEntrando(false)} />
-            </div>
-          </div>
-        ) : (
-          <>
-            <Botao rotulo="Entrar com minha conta" aoTocar={() => setEntrando(true)} />
-            <p className="mt-2 text-xs" style={{ color: 'var(--color-texto-suave)' }}>
-              Entrar é opcional. Sem conta, o app grava só neste aparelho — que é como ele
-              funciona hoje.
-            </p>
-          </>
-        )}
-        {aviso && (
-          <p className="mt-2 text-sm font-bold" style={{ color: 'var(--color-urgencia)' }}>
-            {aviso}
-          </p>
-        )}
+        <Botao rotulo="Entrar com minha conta" destacado aoTocar={onEntrar} />
+        <p className="mt-2 text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+          Entrar é opcional e sincroniza as fichas entre os voluntários. Sem conta, o app grava
+          só neste aparelho — que é como ele funciona hoje.
+        </p>
       </Bloco>
     );
   }

@@ -19,6 +19,7 @@ interface Props {
   onDefinir: <K extends keyof Prefs>(chave: K, valor: Prefs[K]) => void;
   onFechar: () => void;
   onGravarVozes: () => void;
+  onEntrar: () => void;
 }
 
 const TAMANHOS: { id: TamanhoCard; label: string }[] = [
@@ -42,7 +43,7 @@ const LEGENDA: { classe: Classe; label: string }[] = [
   { classe: 'urgencia', label: 'Parar / não' },
 ];
 
-export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVozes }: Props) {
+export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVozes, onEntrar }: Props) {
   useEffect(() => {
     if (!aberto) return;
     const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
@@ -136,7 +137,12 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVoze
               </p>
             </section>
 
-            <Conta />
+            <Conta
+              onEntrar={() => {
+                onEntrar();
+                onFechar();
+              }}
+            />
 
             <TravaDeAcesso />
 

@@ -7,11 +7,12 @@ import { Footer } from './components/Footer';
 import { Frequencia } from './components/Frequencia';
 import { GravarVozes } from './components/GravarVozes';
 import { MainNav, type Vista } from './components/MainNav';
-import { PortaoDePin } from './components/PortaoDePin';
+import { PortaoDoVoluntario } from './components/PortaoDoVoluntario';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
 import { carregarVozes, desbloquearAudio, prepararSons, tocarCard } from './audio/player';
 import { estaDestrancado } from './dados/seguranca';
+import { useConta } from './dados/sessao';
 import { usePrefs } from './hooks/usePrefs';
 import { useTema } from './hooks/useTema';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -23,7 +24,13 @@ export default function App() {
   const [configAberta, setConfigAberta] = useState(false);
   // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
   const [vista, setVista] = useState<Vista>('prancha');
+  /** Para onde voltar quando o login é aberto pelas Configurações. */
+  const [depoisDeEntrar, setDepoisDeEntrar] = useState<Vista>('prancha');
   const [destrancado, setDestrancado] = useState(() => estaDestrancado());
+  const { email: emailDaConta } = useConta();
+  // Entrar com conta já é autenticação forte: pedir o código depois seria
+  // barreira dupla para o mesmo adulto.
+  const liberado = destrancado || Boolean(emailDaConta);
   const timerRef = useRef<number | undefined>(undefined);
 
   useTema(prefs.tema);
@@ -53,6 +60,25 @@ export default function App() {
     timerRef.current = window.setTimeout(() => setCardAtivo(null), 700);
     if (prefs.som) tocarCard(card);
   };
+
+  const areaProtegida = vista === 'ficha' || vista === 'frequencia' || vista === 'vozes';
+
+  /**
+   * Tela cheia, sem cabeçalho nem menu: é uma barreira, e barreira com o menu
+   * do app por trás confunde — dá a impressão de que a tela está atrás de um
+   * pop-up, e deixa clicável o que ainda não foi liberado.
+   */
+  if (vista === 'login' || (areaProtegida && !liberado)) {
+    return (
+      <PortaoDoVoluntario
+        aoLiberar={() => {
+          setDestrancado(true);
+          if (vista === 'login') setVista(depoisDeEntrar);
+        }}
+        aoFechar={() => setVista(vista === 'login' ? depoisDeEntrar : 'prancha')}
+      />
+    );
+  }
 
   return (
     <div
@@ -97,15 +123,11 @@ export default function App() {
           <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
         )}
         {vista === 'agora' && <AgoraEDepois som={prefs.som} />}
-        {vista === 'vozes' && (destrancado ? <GravarVozes /> : <PortaoDePin aoAbrir={() => setDestrancado(true)} />)}
-        {/* Ficha e frequência têm dado de saúde de menor: passam pelo código,
-            quando houver um configurado. */}
-        {(vista === 'ficha' || vista === 'frequencia') &&
-          (destrancado ? (
-            vista === 'ficha' ? <Ficha /> : <Frequencia />
-          ) : (
-            <PortaoDePin aoAbrir={() => setDestrancado(true)} />
-          ))}
+        {/* Ficha, frequência e vozes só chegam aqui já liberadas: o portão
+            acontece antes, em tela cheia. */}
+        {vista === 'ficha' && <Ficha />}
+        {vista === 'frequencia' && <Frequencia />}
+        {vista === 'vozes' && <GravarVozes />}
       </main>
 
       <Footer />
@@ -116,6 +138,10 @@ export default function App() {
         onDefinir={definir}
         onFechar={() => setConfigAberta(false)}
         onGravarVozes={() => setVista('vozes')}
+        onEntrar={() => {
+          setDepoisDeEntrar(vista);
+          setVista('login');
+        }}
       />
     </div>
   );
