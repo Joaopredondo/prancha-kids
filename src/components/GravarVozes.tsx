@@ -18,8 +18,12 @@ import type { Card } from '../types';
 export function GravarVozes() {
   const [comVoz, setComVoz] = useState<Set<string>>(new Set());
   const [gravando, setGravando] = useState<string | null>(null);
+  /** Enquanto o navegador pergunta pelo microfone, o botão precisa dizer isso. */
+  const [pedindo, setPedindo] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const gravador = useRef<MediaRecorder | null>(null);
+  const limite = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     void listarChaves().then((chaves) =>
@@ -31,32 +35,114 @@ export function GravarVozes() {
     );
   }, []);
 
-  const comecar = async (card: Card) => {
-    setErro(null);
-    try {
-      const entrada = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const pedacos: Blob[] = [];
-      const recorder = new MediaRecorder(entrada);
+  /** Formato que o aparelho aceita. iOS grava em mp4; Android, em webm. */
+  const formatoSuportado = () =>
+    ['audio/webm', 'audio/mp4', 'audio/ogg'].find(
+      (tipo) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(tipo),
+    );
 
-      recorder.ondataavailable = (evento) => pedacos.push(evento.data);
-      recorder.onstop = async () => {
-        entrada.getTracks().forEach((faixa) => faixa.stop());
-        await salvarArquivo(chaveDaVoz(card.id), new Blob(pedacos, { type: recorder.mimeType }));
-        esquecerVoz(card.id);
-        setComVoz((atual) => new Set(atual).add(card.id));
-        setGravando(null);
-      };
-
-      gravador.current = recorder;
-      recorder.start();
-      setGravando(card.id);
-    } catch {
-      setErro('Sem acesso ao microfone. Autorize nas permissões do navegador.');
-      setGravando(null);
-    }
+  const encerrarTudo = () => {
+    window.clearTimeout(limite.current);
+    setGravando(null);
+    setPedindo(null);
   };
 
-  const parar = () => gravador.current?.stop();
+  const comecar = async (card: Card) => {
+    setErro(null);
+
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setErro('Este navegador não grava áudio. Tente pelo Chrome ou Safari atualizados.');
+      return;
+    }
+
+    // Sobra de uma gravação anterior mantém o microfone ligado e confunde o
+    // botão: encerra antes de abrir outra.
+    if (gravador.current?.state === 'recording') gravador.current.stop();
+
+    setPedindo(card.id);
+    let entrada: MediaStream;
+    try {
+      entrada = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setPedindo(null);
+      setErro('Sem acesso ao microfone. Autorize nas permissões do navegador e tente de novo.');
+      return;
+    }
+
+    const pedacos: Blob[] = [];
+    const tipo = formatoSuportado();
+    const recorder = new MediaRecorder(entrada, tipo ? { mimeType: tipo } : undefined);
+
+    const soltarMicrofone = () => entrada.getTracks().forEach((faixa) => faixa.stop());
+
+    recorder.ondataavailable = (evento) => {
+      if (evento.data.size > 0) pedacos.push(evento.data);
+    };
+
+    // Sem isto, uma falha ao gravar deixava o botão preso em "Parar" para
+    // sempre, e tocar nele não fazia nada.
+    recorder.onerror = () => {
+      soltarMicrofone();
+      encerrarTudo();
+      setErro('A gravação falhou no meio. Tente de novo.');
+    };
+
+    recorder.onstop = () => {
+      soltarMicrofone();
+      window.clearTimeout(limite.current);
+      setGravando(null);
+      setSalvando(card.id);
+
+      void (async () => {
+        try {
+          if (pedacos.length === 0) throw new Error('nada foi gravado');
+          await salvarArquivo(
+            chaveDaVoz(card.id),
+            new Blob(pedacos, { type: recorder.mimeType || tipo || 'audio/webm' }),
+          );
+          esquecerVoz(card.id);
+          setComVoz((atual) => new Set(atual).add(card.id));
+        } catch {
+          // Armazenamento cheio ou navegação privada: precisa aparecer, senão
+          // o voluntário acha que gravou.
+          setErro('Não deu para salvar a gravação neste aparelho.');
+        } finally {
+          setSalvando(null);
+        }
+      })();
+    };
+
+    gravador.current = recorder;
+    recorder.start();
+    setPedindo(null);
+    setGravando(card.id);
+
+    // Trava de segurança: ninguém grava uma palavra por 30 segundos, e
+    // gravação esquecida mantém o microfone aberto.
+    limite.current = window.setTimeout(() => {
+      if (recorder.state === 'recording') recorder.stop();
+    }, 30_000);
+  };
+
+  /**
+   * Parar tem que funcionar mesmo com o gravador em estado estranho — é o que
+   * estava travando no celular: `stop()` num gravador já inativo lança erro,
+   * o botão continuava escrito "Parar" e o toque não fazia nada.
+   */
+  const parar = () => {
+    const recorder = gravador.current;
+    try {
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop();
+        return;
+      }
+      recorder?.stream.getTracks().forEach((faixa) => faixa.stop());
+      encerrarTudo();
+    } catch {
+      encerrarTudo();
+      setErro('A gravação foi interrompida pelo aparelho. Tente de novo.');
+    }
+  };
 
   const apagar = async (card: Card) => {
     await apagarArquivo(chaveDaVoz(card.id));
@@ -85,6 +171,8 @@ export function GravarVozes() {
         {CARDS.map((card) => {
           const temVoz = comVoz.has(card.id);
           const estaGravando = gravando === card.id;
+          const estaPedindo = pedindo === card.id;
+          const estaSalvando = salvando === card.id;
           return (
             <li
               key={card.id}
@@ -114,16 +202,23 @@ export function GravarVozes() {
 
               <button
                 type="button"
+                disabled={estaSalvando || Boolean(pedindo)}
                 onClick={() => (estaGravando ? parar() : void comecar(card))}
                 aria-label={`${estaGravando ? 'Parar gravação de' : 'Gravar'} ${card.label}`}
-                className="min-h-11 rounded-xl border-2 px-3 text-sm font-bold"
+                className="min-h-11 min-w-24 rounded-xl border-2 px-3 text-sm font-bold disabled:opacity-40"
                 style={{
                   borderColor: estaGravando ? 'transparent' : 'var(--color-linha)',
                   background: estaGravando ? 'var(--color-urgencia)' : 'transparent',
                   color: estaGravando ? '#ffffff' : 'var(--color-texto)',
                 }}
               >
-                {estaGravando ? 'Parar' : '● Gravar'}
+                {estaSalvando
+                  ? 'Salvando…'
+                  : estaGravando
+                    ? '■ Parar'
+                    : estaPedindo
+                      ? 'Permita…'
+                      : '● Gravar'}
               </button>
 
               {temVoz && (
