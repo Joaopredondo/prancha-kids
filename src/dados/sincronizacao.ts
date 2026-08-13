@@ -1,7 +1,10 @@
+import { baixarFotoSeFaltar, baixarVozesQueFaltam, enviarFoto, enviarVoz } from './arquivosNuvem';
+import { esquecerVoz } from '../audio/player';
 import type { Ficha, Marcacao } from './ficha';
 import { fichaPorId, guardarFichaDaNuvem, listarFichasComApagadas } from './fichas';
-import { baixarDaFila, listarPendencias, registrarSync, ultimoSync } from './fila';
+import { baixarDaFila, listarPendencias, registrarSync, ROTINA_GERAL, ultimoSync } from './fila';
 import { guardarPerfilDaNuvem, listarPerfisComApagados, type Perfil } from './perfis';
+import { guardarRotinaDaNuvem, passosSalvos } from './rotinas';
 import { supabase } from './supabase';
 
 /**
@@ -91,6 +94,22 @@ async function enviar(ministerioId: string): Promise<number> {
       ];
     });
 
+  const rotinas = pendencias
+    .filter((p) => p.tabela === 'rotinas')
+    .flatMap((p) => {
+      const passos = passosSalvos(p.id);
+      if (passos.length === 0) return [];
+      enviados.push(p);
+      return [
+        {
+          ministerio_id: ministerioId,
+          crianca_id: p.id,
+          passos,
+          atualizado_em: new Date().toISOString(),
+        },
+      ];
+    });
+
   // Crianças primeiro: a ficha aponta para elas.
   if (criancas.length > 0) {
     const { error } = await supabase.from('criancas').upsert(criancas);
@@ -100,9 +119,25 @@ async function enviar(ministerioId: string): Promise<number> {
     const { error } = await supabase.from('fichas').upsert(fichas);
     if (error) throw new Error(error.message);
   }
+  if (rotinas.length > 0) {
+    const { error } = await supabase
+      .from('rotinas')
+      .upsert(rotinas, { onConflict: 'ministerio_id,crianca_id' });
+    if (error) throw new Error(error.message);
+  }
+
+  // Binários vão depois das linhas: se o envio do arquivo falhar, o cadastro
+  // já está lá e a foto sobe na próxima tentativa.
+  for (const item of criancas) {
+    if (item.tem_foto) await enviarFoto(ministerioId, item.id);
+  }
+  for (const pendencia of pendencias.filter((p) => p.tabela === 'vozes')) {
+    await enviarVoz(ministerioId, pendencia.id);
+    enviados.push(pendencia);
+  }
 
   baixarDaFila(enviados);
-  return criancas.length + fichas.length;
+  return criancas.length + fichas.length + rotinas.length;
 }
 
 async function receber(ministerioId: string): Promise<number> {
@@ -174,6 +209,30 @@ async function receber(ministerioId: string): Promise<number> {
       atualizadoEm: remotoEm,
       apagadoEm: linha.apagado_em ? paraMs(linha.apagado_em) : null,
     } as Ficha);
+    recebidos += 1;
+  }
+
+  const { data: rotinas, error: erroRotinas } = await supabase
+    .from('rotinas')
+    .select('*')
+    .eq('ministerio_id', ministerioId)
+    .gt('atualizado_em', desde);
+  if (erroRotinas) throw new Error(erroRotinas.message);
+
+  for (const linha of rotinas ?? []) {
+    guardarRotinaDaNuvem(linha.crianca_id ?? ROTINA_GERAL, linha.passos ?? []);
+    recebidos += 1;
+  }
+
+  // Foto: só desce quando o cadastro diz que existe e o aparelho não tem.
+  for (const perfil of listarPerfisComApagados()) {
+    if (!perfil.temFoto || perfil.apagadoEm) continue;
+    if (await baixarFotoSeFaltar(ministerioId, perfil.id)) recebidos += 1;
+  }
+
+  // Voz gravada por um voluntário serve a todos os aparelhos.
+  for (const cardId of await baixarVozesQueFaltam(ministerioId)) {
+    esquecerVoz(cardId);
     recebidos += 1;
   }
 

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { quantasPendencias } from '../dados/fila';
+import { listarChaves } from '../dados/arquivos';
+import { enfileirarTudo, quantasPendencias, ROTINA_GERAL } from '../dados/fila';
+import { listarFichasComApagadas } from '../dados/fichas';
+import { listarPerfisComApagados } from '../dados/perfis';
 import { sincronizar, type Resultado } from '../dados/sincronizacao';
 
 const INTERVALO_MS = 3 * 60 * 1000;
@@ -44,5 +47,28 @@ export function useSincronizacao(ministerioId: string | null) {
     };
   }, [ministerioId, rodar]);
 
-  return { pendentes, ocupado, ultimo, sincronizarAgora: rodar };
+  /**
+   * Manda para a nuvem tudo que já estava no aparelho.
+   *
+   * A fila só registra o que muda a partir de agora; sem isto, quem já tinha
+   * fichas antes de entrar na conta não veria nada subir.
+   */
+  const enviarTudo = useCallback(async () => {
+    const chaves = await listarChaves();
+    const rotinas = [
+      ROTINA_GERAL,
+      ...listarPerfisComApagados().map((perfil) => perfil.id),
+    ];
+
+    enfileirarTudo(
+      listarPerfisComApagados().map((perfil) => perfil.id),
+      listarFichasComApagadas().map((ficha) => ficha.id),
+      rotinas,
+      chaves.filter((c) => c.startsWith('voz:')).map((c) => c.slice('voz:'.length)),
+    );
+    setPendentes(quantasPendencias());
+    return rodar();
+  }, [rodar]);
+
+  return { pendentes, ocupado, ultimo, sincronizarAgora: rodar, enviarTudo };
 }

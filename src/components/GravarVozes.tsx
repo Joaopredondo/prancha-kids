@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { apagarArquivo, chaveDaVoz, listarChaves, salvarArquivo } from '../dados/arquivos';
+import { enfileirar } from '../dados/fila';
 import { CARDS, falaDoCard } from '../data/cards';
 import { esquecerVoz, tocarCard } from '../audio/player';
 import type { Card } from '../types';
@@ -43,6 +44,9 @@ export function GravarVozes() {
         entrada.getTracks().forEach((faixa) => faixa.stop());
         await salvarArquivo(chaveDaVoz(card.id), new Blob(pedacos, { type: recorder.mimeType }));
         esquecerVoz(card.id);
+        // A voz é do ministério: sobe para os outros aparelhos não precisarem
+        // regravar as mesmas palavras.
+        enfileirar('vozes', card.id);
         setComVoz((atual) => new Set(atual).add(card.id));
         setGravando(null);
       };
