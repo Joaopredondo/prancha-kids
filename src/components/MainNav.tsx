@@ -5,7 +5,7 @@ import type { Categoria } from '../types';
 import { BotaoSegurar } from './BotaoSegurar';
 
 export type Aba = Categoria | 'tudo';
-export type Vista = 'prancha' | 'agora' | 'ficha' | 'frequencia' | 'vozes';
+export type Vista = 'prancha' | 'agora' | 'ficha' | 'frequencia' | 'vozes' | 'login';
 
 interface Props {
   vista: Vista;
