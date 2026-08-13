@@ -1,3 +1,4 @@
+import { enfileirar, ROTINA_GERAL } from './fila';
 import { ROTINA_PADRAO } from './figurinhas';
 import { rotinaInicial, type EstadoDaRotina } from './rotina';
 
@@ -22,6 +23,24 @@ type Salvo = { rotina: string[]; indice: number; dia: string };
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 
+/** Lista de passos guardada para uma criança (ou para o aparelho). */
+export function passosSalvos(perfilId: string | null = null): string[] {
+  return lerRotina(perfilId === ROTINA_GERAL ? null : perfilId).rotina;
+}
+
+/** Grava vindo da nuvem, sem reenfileirar. */
+export function guardarRotinaDaNuvem(perfilId: string, passos: string[]): void {
+  if (passos.length === 0) return;
+  const alvo = perfilId === ROTINA_GERAL ? null : perfilId;
+  try {
+    const atual = lerRotina(alvo);
+    const salvo: Salvo = { rotina: passos, indice: atual.indice, dia: hoje() };
+    localStorage.setItem(chaveDe(alvo), JSON.stringify(salvo));
+  } catch {
+    // Sem espaço: a rotina da tela continua valendo.
+  }
+}
+
 export function lerRotina(perfilId: string | null = null): EstadoDaRotina {
   try {
     const bruto = localStorage.getItem(chaveDe(perfilId));
@@ -40,6 +59,9 @@ export function salvarRotina(estado: EstadoDaRotina, perfilId: string | null = n
   try {
     const salvo: Salvo = { rotina: estado.rotina, indice: estado.indice, dia: hoje() };
     localStorage.setItem(chaveDe(perfilId), JSON.stringify(salvo));
+    // O passo atual é do dia e não interessa aos outros aparelhos; a fila
+    // carrega a lista de passos, que é o que se repete toda semana.
+    enfileirar('rotinas', perfilId ?? ROTINA_GERAL);
   } catch {
     // Modo privado ou armazenamento cheio: a rotina da tela continua valendo.
   }

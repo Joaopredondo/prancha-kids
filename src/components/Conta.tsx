@@ -12,7 +12,7 @@ import { useSincronizacao } from '../hooks/useSincronizacao';
  */
 export function Conta({ onEntrar }: { onEntrar: () => void }) {
   const { carregando, email, vinculo, recarregar } = useConta();
-  const { pendentes, ocupado, ultimo, sincronizarAgora } = useSincronizacao(
+  const { pendentes, ocupado, ultimo, sincronizarAgora, enviarTudo } = useSincronizacao(
     vinculo?.ministerioId ?? null,
   );
   const [convite, setConvite] = useState('');
@@ -65,6 +65,7 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
           rotulo={ocupado ? 'Sincronizando…' : 'Sincronizar agora'}
           aoTocar={() => void sincronizarAgora()}
         />
+        <Botao rotulo="Enviar tudo deste aparelho" aoTocar={() => void enviarTudo()} />
         <span className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
           {pendentes > 0
             ? `${pendentes} ${pendentes === 1 ? 'mudança pendente' : 'mudanças pendentes'}`

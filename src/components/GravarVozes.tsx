@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { apagarArquivo, chaveDaVoz, listarChaves, salvarArquivo } from '../dados/arquivos';
+import { enfileirar } from '../dados/fila';
 import { CARDS, falaDoCard } from '../data/cards';
 import { esquecerVoz, tocarCard } from '../audio/player';
 import type { Card } from '../types';
@@ -62,7 +63,25 @@ export function GravarVozes() {
     setPedindo(card.id);
     let entrada: MediaStream;
     try {
-      entrada = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const entrada = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const pedacos: Blob[] = [];
+      const recorder = new MediaRecorder(entrada);
+
+      recorder.ondataavailable = (evento) => pedacos.push(evento.data);
+      recorder.onstop = async () => {
+        entrada.getTracks().forEach((faixa) => faixa.stop());
+        await salvarArquivo(chaveDaVoz(card.id), new Blob(pedacos, { type: recorder.mimeType }));
+        esquecerVoz(card.id);
+        // A voz é do ministério: sobe para os outros aparelhos não precisarem
+        // regravar as mesmas palavras.
+        enfileirar('vozes', card.id);
+        setComVoz((atual) => new Set(atual).add(card.id));
+        setGravando(null);
+      };
+
+      gravador.current = recorder;
+      recorder.start();
+      setGravando(card.id);
     } catch {
       setPedindo(null);
       setErro('Sem acesso ao microfone. Autorize nas permissões do navegador e tente de novo.');

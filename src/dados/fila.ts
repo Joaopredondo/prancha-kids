@@ -6,7 +6,10 @@
  * envio acontece quando houver rede.
  */
 
-export type Tabela = 'criancas' | 'fichas' | 'rotinas';
+export type Tabela = 'criancas' | 'fichas' | 'rotinas' | 'vozes';
+
+/** Valor reservado para a rotina do aparelho, sem criança escolhida. */
+export const ROTINA_GERAL = 'geral';
 
 const CHAVE = 'prancha-kids:pendentes';
 
@@ -51,3 +54,22 @@ export const ultimoSync = (): string =>
   localStorage.getItem(CHAVE_SYNC) ?? '1970-01-01T00:00:00.000Z';
 
 export const registrarSync = (quando: string) => localStorage.setItem(CHAVE_SYNC, quando);
+
+/**
+ * Põe na fila tudo o que já existe no aparelho.
+ *
+ * A fila só registra o que muda a partir de agora, então quem já tinha fichas
+ * antes de entrar na conta não veria nada subir. Isto é o "enviar tudo".
+ */
+export function enfileirarTudo(
+  criancas: string[],
+  fichas: string[],
+  rotinas: string[],
+  vozes: string[],
+): number {
+  criancas.forEach((id) => enfileirar('criancas', id));
+  fichas.forEach((id) => enfileirar('fichas', id));
+  rotinas.forEach((id) => enfileirar('rotinas', id));
+  vozes.forEach((id) => enfileirar('vozes', id));
+  return quantasPendencias();
+}
