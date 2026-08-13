@@ -7,11 +7,12 @@ import { Footer } from './components/Footer';
 import { Frequencia } from './components/Frequencia';
 import { GravarVozes } from './components/GravarVozes';
 import { MainNav, type Vista } from './components/MainNav';
-import { PortaoDePin } from './components/PortaoDePin';
+import { PortaoDoVoluntario } from './components/PortaoDoVoluntario';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
 import { carregarVozes, desbloquearAudio, prepararSons, tocarCard } from './audio/player';
 import { estaDestrancado } from './dados/seguranca';
+import { useConta } from './dados/sessao';
 import { usePrefs } from './hooks/usePrefs';
 import { useTema } from './hooks/useTema';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -24,6 +25,10 @@ export default function App() {
   // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
   const [vista, setVista] = useState<Vista>('prancha');
   const [destrancado, setDestrancado] = useState(() => estaDestrancado());
+  const { email: emailDaConta } = useConta();
+  // Entrar com conta já é autenticação forte: pedir o código depois seria
+  // barreira dupla para o mesmo adulto.
+  const liberado = destrancado || Boolean(emailDaConta);
   const timerRef = useRef<number | undefined>(undefined);
 
   useTema(prefs.tema);
@@ -97,15 +102,25 @@ export default function App() {
           <Board cards={cards} cardAtivo={cardAtivo} onTocar={aoTocar} />
         )}
         {vista === 'agora' && <AgoraEDepois som={prefs.som} />}
-        {vista === 'vozes' && (destrancado ? <GravarVozes /> : <PortaoDePin aoAbrir={() => setDestrancado(true)} />)}
+        {vista === 'vozes' &&
+          (liberado ? <GravarVozes /> : <PortaoDoVoluntario aoLiberar={() => setDestrancado(true)} />)}
         {/* Ficha e frequência têm dado de saúde de menor: passam pelo código,
             quando houver um configurado. */}
         {(vista === 'ficha' || vista === 'frequencia') &&
-          (destrancado ? (
+          (liberado ? (
             vista === 'ficha' ? <Ficha /> : <Frequencia />
           ) : (
-            <PortaoDePin aoAbrir={() => setDestrancado(true)} />
+            <PortaoDoVoluntario aoLiberar={() => setDestrancado(true)} />
           ))}
+        {vista === 'login' && (
+          <PortaoDoVoluntario
+            aoLiberar={() => {
+              setDestrancado(true);
+              setVista('prancha');
+            }}
+            aoFechar={() => setVista('prancha')}
+          />
+        )}
       </main>
 
       <Footer />
@@ -116,6 +131,7 @@ export default function App() {
         onDefinir={definir}
         onFechar={() => setConfigAberta(false)}
         onGravarVozes={() => setVista('vozes')}
+        onEntrar={() => setVista('login')}
       />
     </div>
   );
