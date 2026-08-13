@@ -60,10 +60,13 @@ export function GravarVozes() {
     if (gravador.current?.state === 'recording') gravador.current.stop();
 
     setPedindo(card.id);
-    let entrada: MediaStream;
-    try {
-      entrada = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
+    // `const` em vez de `let` atribuído dentro do try: as funções abaixo usam
+    // `entrada`, e o TypeScript não consegue provar a atribuição dentro delas.
+    const entrada = await navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .catch(() => null);
+
+    if (!entrada) {
       setPedindo(null);
       setErro('Sem acesso ao microfone. Autorize nas permissões do navegador e tente de novo.');
       return;
