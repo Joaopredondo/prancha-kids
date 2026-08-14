@@ -61,28 +61,13 @@ export function GravarVozes() {
     if (gravador.current?.state === 'recording') gravador.current.stop();
 
     setPedindo(card.id);
-    let entrada: MediaStream;
-    try {
-      const entrada = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const pedacos: Blob[] = [];
-      const recorder = new MediaRecorder(entrada);
+    // `const` em vez de `let` atribuído dentro do try: as funções abaixo usam
+    // `entrada`, e o TypeScript não consegue provar a atribuição dentro delas.
+    const entrada = await navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .catch(() => null);
 
-      recorder.ondataavailable = (evento) => pedacos.push(evento.data);
-      recorder.onstop = async () => {
-        entrada.getTracks().forEach((faixa) => faixa.stop());
-        await salvarArquivo(chaveDaVoz(card.id), new Blob(pedacos, { type: recorder.mimeType }));
-        esquecerVoz(card.id);
-        // A voz é do ministério: sobe para os outros aparelhos não precisarem
-        // regravar as mesmas palavras.
-        enfileirar('vozes', card.id);
-        setComVoz((atual) => new Set(atual).add(card.id));
-        setGravando(null);
-      };
-
-      gravador.current = recorder;
-      recorder.start();
-      setGravando(card.id);
-    } catch {
+    if (!entrada) {
       setPedindo(null);
       setErro('Sem acesso ao microfone. Autorize nas permissões do navegador e tente de novo.');
       return;
@@ -120,6 +105,9 @@ export function GravarVozes() {
             new Blob(pedacos, { type: recorder.mimeType || tipo || 'audio/webm' }),
           );
           esquecerVoz(card.id);
+          // A voz é do ministério: sobe para os outros aparelhos não
+          // precisarem regravar as mesmas palavras.
+          enfileirar('vozes', card.id);
           setComVoz((atual) => new Set(atual).add(card.id));
         } catch {
           // Armazenamento cheio ou navegação privada: precisa aparecer, senão
