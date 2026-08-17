@@ -1,12 +1,14 @@
-import { useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
 import logo from '../assets/ipi.png';
-import { CARDS } from '../data/cards';
 import { conferirPin, temPin } from '../dados/seguranca';
 import { entrar } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
+import { CenaDaPrancha } from './CenaDaPrancha';
+import type { Momento } from '../three/cenaDaPrancha';
 
 type Caminho = 'conta' | 'codigo';
+type Campo = 'email' | 'senha';
 
 interface Props {
   /** Chamado quando a pessoa provou que pode entrar. */
@@ -14,12 +16,6 @@ interface Props {
   /** Presente quando a tela é aberta pelas Configurações, e não como barreira. */
   aoFechar?: () => void;
 }
-
-/** Cards que a criança já conhece, como identidade visual da tela. */
-const VITRINE = ['sim', 'oi', 'agua', 'louvor'].flatMap((id) => {
-  const card = CARDS.find((c) => c.id === id);
-  return card ? [card] : [];
-});
 
 /**
  * Porta da área do voluntário — ficha, frequência e gravação de vozes.
@@ -44,8 +40,46 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
   const [dados, setDados] = useState({ email: '', senha: '' });
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const [tentativasErradas, setTentativasErradas] = useState(0);
   const [emailInvalido, setEmailInvalido] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  /** Segura a tela por um instante com o gesto de "liberado" antes de sair. */
+  const [liberando, setLiberando] = useState(false);
+  const [campoFocado, setCampoFocado] = useState<Campo | null>(null);
+  /** Recusa é reação de um instante, não estado: some sozinha. */
+  const [recusando, setRecusando] = useState(false);
+
+  useEffect(() => {
+    if (tentativasErradas === 0) return;
+    setRecusando(true);
+    const id = window.setTimeout(() => setRecusando(false), 1400);
+    return () => window.clearTimeout(id);
+  }, [tentativasErradas]);
+
+  // A cena do painel responde ao formulário. A ordem importa: a comemoração
+  // ganha da recusa, e a recusa ganha do campo em foco — senão a reação ao
+  // erro nunca apareceria, porque o campo continua focado depois de falhar.
+  const momento: Momento = liberando
+    ? 'sucesso'
+    : recusando
+      ? 'erro'
+      : campoFocado === 'senha'
+        ? 'senha'
+        : campoFocado
+          ? 'digitando'
+          : 'repouso';
+
+  const abrirAPorta = () => {
+    if (semMovimento) {
+      aoLiberar();
+      return;
+    }
+    setLiberando(true);
+    // Tempo do card virar e mostrar o "Sim": a volta leva 0,85s e a face
+    // aparece na metade dela. Com os 420ms de antes a tela saía antes de o
+    // card sequer terminar de girar.
+    window.setTimeout(aoLiberar, 1150);
+  };
 
   const tentarConta = async () => {
     if (!dados.email.includes('@')) {
@@ -57,9 +91,10 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
     setOcupado(false);
     if (falha) {
       setErro(falha);
+      setTentativasErradas((n) => n + 1);
       return;
     }
-    aoLiberar();
+    abrirAPorta();
   };
 
   const tentarCodigo = async (valor: string) => {
@@ -68,60 +103,61 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
     if (valor.length < 4) return;
 
     if (await conferirPin(valor)) {
-      aoLiberar();
+      abrirAPorta();
       return;
     }
     setErro('Código errado.');
+    setTentativasErradas((n) => n + 1);
     setCodigo('');
   };
 
   return (
-    // Ocupa a janela inteira: aqui não existe cabeçalho nem menu do app.
+    <MotionConfig reducedMotion="user">
+    {/* Ocupa a janela inteira: aqui não existe cabeçalho nem menu do app. */}
     <div className="grid min-h-dvh gap-0 lg:grid-cols-2">
       {/* Painel de identidade. No celular vira uma faixa curta no topo. */}
       <aside
-        className="flex flex-col justify-center gap-6 px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))] lg:px-10 lg:py-14"
+        className="relative overflow-hidden"
         style={{
           background:
             'linear-gradient(160deg, color-mix(in oklab, var(--color-coisa) 14%, var(--color-fundo)), var(--color-fundo))',
         }}
       >
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="" aria-hidden="true" className="size-14 rounded-2xl sm:size-16" />
-          <div>
-            <p className="text-2xl font-extrabold leading-tight sm:text-3xl">Prancha Kids</p>
-            <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-              2ª IPI · Ministério Infantil
-            </p>
-          </div>
+        <CenaDaPrancha momento={momento} />
+
+        {/* O conteúdo sobe para o alto: a metade de baixo é palco do card que
+            gira, e texto por cima dele não se lê. */}
+        <div className="relative z-10 flex h-full flex-col justify-center gap-6 px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))] lg:justify-start lg:px-10 lg:pt-24">
+          <motion.div
+            initial={semMovimento ? false : { opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center gap-3"
+          >
+            <img src={logo} alt="" aria-hidden="true" className="size-14 rounded-2xl sm:size-16" />
+            <div>
+              <p className="text-2xl font-extrabold leading-tight sm:text-3xl">Prancha Kids</p>
+              <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+                2ª IPI · Ministério Infantil
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.p
+            initial={semMovimento ? false : { opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: 0.05 }}
+            className="max-w-sm text-base leading-relaxed"
+            style={{ color: 'var(--color-texto-suave)' }}
+          >
+            A prancha é da criança e nunca pede senha. Esta parte é do voluntário: ficha do
+            culto, frequência e cadastro.
+          </motion.p>
         </div>
-
-        <p className="max-w-sm text-base leading-relaxed" style={{ color: 'var(--color-texto-suave)' }}>
-          A prancha é da criança e nunca pede senha. Esta parte é do voluntário: ficha do
-          culto, frequência e cadastro.
-        </p>
-
-        {/* Amostra dos cards: diz o que é o app antes de qualquer texto. */}
-        <ul aria-hidden="true" className="hidden grid-cols-4 gap-2 sm:grid lg:max-w-sm">
-          {VITRINE.map((card, i) => (
-            <motion.li
-              key={card.id}
-              data-classe={card.classe}
-              initial={semMovimento ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * i, duration: 0.25 }}
-              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-[3px]"
-              style={{ borderColor: 'var(--borda)', background: 'var(--color-superficie)' }}
-            >
-              <span className="text-2xl leading-none">{card.emoji}</span>
-              <span className="text-[0.65rem] font-bold">{card.label}</span>
-            </motion.li>
-          ))}
-        </ul>
       </aside>
 
       {/* Formulário. */}
-      <main className="flex items-center justify-center px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 lg:px-10">
+      <main className="relative flex items-center justify-center px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 lg:px-10">
         <motion.div
           initial={semMovimento ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -159,8 +195,14 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
             </div>
           )}
 
+          <AnimatePresence mode="wait" initial={false}>
           {caminho === 'conta' && comConta ? (
-            <form
+            <motion.form
+              key="conta"
+              initial={semMovimento ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={semMovimento ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
               className="flex flex-col gap-4"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -179,13 +221,19 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                   setEmailInvalido(false);
                   setErro(null);
                 }}
-                aoSair={() => setEmailInvalido(dados.email.length > 0 && !dados.email.includes('@'))}
+                aoFocar={() => setCampoFocado('email')}
+                aoSair={() => {
+                  setCampoFocado(null);
+                  setEmailInvalido(dados.email.length > 0 && !dados.email.includes('@'));
+                }}
               />
               <Campo
                 rotulo="Senha"
                 tipo="password"
                 autoCompletar="current-password"
                 valor={dados.senha}
+                aoFocar={() => setCampoFocado('senha')}
+                aoSair={() => setCampoFocado(null)}
                 aoMudar={(v) => {
                   setDados({ ...dados, senha: v });
                   setErro(null);
@@ -212,9 +260,16 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                 </button>{' '}
                 — o app funciona igual, só sem sincronizar.
               </p>
-            </form>
+            </motion.form>
           ) : (
-            <div className="flex flex-col items-center gap-3">
+            <motion.div
+              key="codigo"
+              initial={semMovimento ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={semMovimento ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="flex flex-col items-center gap-3"
+            >
               <label className="w-full text-center">
                 <span className="text-sm font-bold">Código de 4 dígitos</span>
                 <input
@@ -223,6 +278,8 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                   autoComplete="off"
                   maxLength={4}
                   value={codigo}
+                  onFocus={() => setCampoFocado('senha')}
+                  onBlur={() => setCampoFocado(null)}
                   onChange={(e) => void tentarCodigo(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   className="mt-2 min-h-16 w-full rounded-2xl border-2 text-center text-3xl font-extrabold tracking-[0.4em] focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
@@ -237,17 +294,22 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                   Configurações → Código do voluntário.
                 </p>
               )}
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {erro && (
-            <p
+            <motion.p
+              key={tentativasErradas}
               role="alert"
+              initial={semMovimento ? false : { x: 0 }}
+              animate={semMovimento ? undefined : { x: [0, -6, 6, -4, 4, 0] }}
+              transition={{ duration: 0.4 }}
               className="text-sm font-bold"
               style={{ color: 'var(--color-urgencia)' }}
             >
               {erro}
-            </p>
+            </motion.p>
           )}
 
           {aoFechar && (
@@ -261,8 +323,39 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
             </button>
           )}
         </motion.div>
+
+        {/* Confirmação de "liberado". Cobre só a coluna do formulário, e não a
+            janela inteira: do outro lado o card da prancha está comemorando, e
+            era justamente isso que o véu de tela cheia escondia. */}
+        <AnimatePresence>
+          {liberando && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0 z-40 grid place-items-center"
+              style={{
+                background: 'color-mix(in oklab, var(--color-fundo) 88%, transparent)',
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                // Entra depois do card começar a virar: primeiro a comemoração,
+                // depois o carimbo.
+                transition={{ type: 'spring', stiffness: 320, damping: 20, delay: 0.3 }}
+                aria-hidden="true"
+                className="grid size-20 place-items-center rounded-full text-4xl font-black"
+                style={{ background: 'var(--color-acao)', color: '#ffffff' }}
+              >
+                ✓
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
+    </MotionConfig>
   );
 }
 
@@ -272,13 +365,20 @@ function Aba({ rotulo, ativa, aoTocar }: { rotulo: string; ativa: boolean; aoToc
       type="button"
       onClick={aoTocar}
       aria-pressed={ativa}
-      className="min-h-11 flex-1 cursor-pointer rounded-full text-sm font-bold transition-colors duration-200"
-      style={{
-        background: ativa ? 'var(--color-texto)' : 'transparent',
-        color: ativa ? 'var(--color-fundo)' : 'var(--color-texto-suave)',
-      }}
+      className="relative min-h-11 flex-1 cursor-pointer rounded-full text-sm font-bold"
+      style={{ color: ativa ? 'var(--color-fundo)' : 'var(--color-texto-suave)' }}
     >
-      {rotulo}
+      {/* `layoutId` compartilhado: a pílula desliza de uma aba para a outra
+          em vez de sumir numa e reaparecer na outra. */}
+      {ativa && (
+        <motion.span
+          layoutId="aba-ativa"
+          className="absolute inset-0 rounded-full"
+          style={{ background: 'var(--color-texto)' }}
+          transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+        />
+      )}
+      <span className="relative z-10">{rotulo}</span>
     </button>
   );
 }
@@ -288,6 +388,7 @@ function Campo({
   tipo,
   valor,
   aoMudar,
+  aoFocar,
   aoSair,
   autoCompletar,
   invalido,
@@ -297,6 +398,7 @@ function Campo({
   tipo: string;
   valor: string;
   aoMudar: (valor: string) => void;
+  aoFocar?: () => void;
   aoSair?: () => void;
   autoCompletar: string;
   invalido?: boolean;
@@ -311,6 +413,7 @@ function Campo({
         autoComplete={autoCompletar}
         aria-invalid={invalido || undefined}
         onChange={(e) => aoMudar(e.target.value)}
+        onFocus={aoFocar}
         onBlur={aoSair}
         className="mt-1 min-h-14 w-full rounded-2xl border-2 px-4 text-base focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{
