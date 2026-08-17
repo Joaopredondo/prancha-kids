@@ -8,7 +8,7 @@ import type { Card } from '../types';
 /**
  * Grava a voz de cada card com o microfone do aparelho.
  *
- * Resolve o gargalo real do projeto: os 37 áudios. A voz da mãe ou da
+ * Resolve o gargalo real do projeto: os 42 áudios. A voz da mãe ou da
  * professora funciona melhor que qualquer TTS com a criança, e aqui sai sem
  * ferramenta externa, sem conta e sem custo.
  *

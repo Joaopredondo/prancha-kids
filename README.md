@@ -19,7 +19,7 @@ npm run build && npm run preview
 
 ## Como o conteúdo funciona
 
-Tudo vem de `src/data/cards.ts` — 37 cards, cada um com:
+Tudo vem de `src/data/cards.ts` — 42 cards, cada um com:
 
 | campo | para que serve |
 |---|---|
@@ -86,7 +86,7 @@ O app toca `public/audio/{id}.mp3` quando o arquivo existe e cai para a voz do
 navegador (`speechSynthesis`) quando não existe — nunca fica mudo.
 
 Como a voz do navegador varia muito entre aparelhos (Android costuma ter voz pt-BR
-ruim ou nenhuma), o ideal é gerar os 37 arquivos uma vez:
+ruim ou nenhuma), o ideal é gerar os 42 arquivos uma vez:
 
 1. **Gravado por uma pessoa** (melhor resultado com criança): grave cada palavra
    nomeando o arquivo com o id do card e rode
