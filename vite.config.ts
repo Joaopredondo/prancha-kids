@@ -56,6 +56,10 @@ export default defineConfig({
       workbox: {
         // Imagens e áudios entram no precache: a prancha funciona offline.
         globPatterns: ['**/*.{js,css,html,svg,png,webp,mp3,woff2}'],
+        // A cena 3D da tela de login é só enfeite: não vale travar a
+        // instalação offline baixando o three.js (~550 kB) de cara. Sem ela
+        // no cache, a tela de login continua funcionando — só sem a cena.
+        globIgnores: ['**/assets/cenaDaPrancha-*.js'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
       manifest: {
