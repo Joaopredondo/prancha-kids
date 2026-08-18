@@ -28,6 +28,7 @@ import {
 } from '../dados/fichas';
 import { apagarArquivo, chaveDaFoto } from '../dados/arquivos';
 import { apagarPerfil, listarPerfis, perfilPorId, salvarPerfil, type Perfil } from '../dados/perfis';
+import { Celebracao } from './Celebracao';
 import { SeletorDeCrianca } from './SeletorDeCrianca';
 
 /**
@@ -46,6 +47,7 @@ export function Ficha() {
   const [ficha, setFicha] = useState<TipoDaFicha>(() => fichaVazia());
   const [modo, setModo] = useState<'edicao' | 'leitura'>('edicao');
   const [salvaEm, setSalvaEm] = useState<number | null>(null);
+  const [comemorando, setComemorando] = useState(false);
   const [anteriores, setAnteriores] = useState<TipoDaFicha[]>([]);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [filtro, setFiltro] = useState<Filtro>({ perfilId: null, dia: null, horario: null });
@@ -66,6 +68,7 @@ export function Ficha() {
     setFicha(salvarFicha(ficha));
     setSalvaEm(Date.now());
     setAnteriores(listarFichas());
+    setComemorando(true);
   };
 
   /** Ficha nova já identificada com o cadastro da criança escolhida. */
@@ -548,6 +551,8 @@ export function Ficha() {
         </Secao>
         </div>
       )}
+
+      <Celebracao aberto={comemorando} aoFechar={() => setComemorando(false)} />
     </div>
   );
 }
