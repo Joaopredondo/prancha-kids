@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import gsap from 'gsap';
+import { Flip } from 'gsap/Flip';
 import { falarTexto } from '../audio/player';
 import { temImagem } from '../assets/disponibilidade';
 import { FIGURINHAS, figurinhaPorId, type Figurinha } from '../dados/figurinhas';
@@ -20,6 +22,8 @@ import {
   type EstadoDaRotina,
 } from '../dados/rotina';
 import { BotaoSegurar } from './BotaoSegurar';
+
+gsap.registerPlugin(Flip);
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -46,6 +50,7 @@ const CHAVE_DA_CRIANCA = 'prancha-kids:crianca-da-rotina';
 export function AgoraEDepois({ som }: { som: boolean }) {
   const [estado, setEstado] = useState<EstadoDaRotina>(() => rotinaInicial());
   const [modo, setModo] = useState<Modo>('voluntario');
+  const semMovimento = useReducedMotion();
   const [montando, setMontando] = useState(false);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [perfilId, setPerfilId] = useState<string | null>(() =>
@@ -72,6 +77,57 @@ export function AgoraEDepois({ som }: { som: boolean }) {
     [perfilId],
   );
 
+  /**
+   * Troca de passo com a figurinha viajando de DEPOIS para AGORA.
+   *
+   * O quadro existe para a criança entender que uma atividade terminou e outra
+   * começou — e é justamente na troca que a crise costuma acontecer. Ver a
+   * figurinha **atravessar** para o lugar do AGORA mostra isso acontecendo;
+   * trocar o conteúdo num piscar deixa a relação entre os dois quadros
+   * invisível, que é como estava antes.
+   *
+   * A posição na rotina é o que identifica a figurinha para o Flip, e não o id
+   * dela: rotina com a mesma atividade repetida (dois lanches, por exemplo)
+   * daria dois elementos com a mesma identidade e o Flip animaria o par errado.
+   */
+  const palco = useRef<HTMLDivElement>(null);
+  const posicoesAntes = useRef<Flip.FlipState | null>(null);
+
+  const guardarComTravessia = useCallback(
+    (proximo: EstadoDaRotina) => {
+      if (!semMovimento && palco.current) {
+        posicoesAntes.current = Flip.getState(palco.current.querySelectorAll('[data-flip-id]'));
+      }
+      guardar(proximo);
+    },
+    [guardar, semMovimento],
+  );
+
+  useLayoutEffect(() => {
+    const antes = posicoesAntes.current;
+    if (!antes) return;
+    posicoesAntes.current = null;
+
+    Flip.from(antes, {
+      duration: 0.55,
+      ease: 'power2.inOut',
+      // Sem isto a figurinha não consegue sair do quadro em que está: ela é
+      // filha do botão AGORA/DEPOIS e ficaria recortada no caminho.
+      absolute: true,
+      // A que chega ao DEPOIS não vinha de lugar nenhum; a que sai do AGORA
+      // acabou. Aparecer e sumir no lugar é mais honesto que fazê-las deslizar
+      // de fora da tela.
+      onEnter: (alvos) =>
+        gsap.fromTo(
+          alvos,
+          { opacity: 0, scale: 0.86 },
+          { opacity: 1, scale: 1, duration: 0.4, ease: 'power2.out' },
+        ),
+      onLeave: (alvos) =>
+        gsap.to(alvos, { opacity: 0, scale: 0.86, duration: 0.3, ease: 'power2.in' }),
+    });
+  }, [estado.indice, estado.rotina]);
+
   const escolherCrianca = (id: string | null) => {
     setPerfilId(id);
     if (id) localStorage.setItem(CHAVE_DA_CRIANCA, id);
@@ -84,7 +140,7 @@ export function AgoraEDepois({ som }: { som: boolean }) {
       return;
     }
     const proximo = avancar(estado);
-    guardar(proximo);
+    guardarComTravessia(proximo);
     const nome = figurinhaPorId(passoAtual(proximo) ?? '')?.nome;
     if (nome) anunciar(`Agora: ${nome}`);
   };
@@ -118,22 +174,24 @@ export function AgoraEDepois({ som }: { som: boolean }) {
       <FaixaDaRotina
         estado={estado}
         aoEscolher={(posicao) => {
-          guardar(irPara(estado, posicao));
+          guardarComTravessia(irPara(estado, posicao));
           const nome = figurinhaPorId(estado.rotina[posicao] ?? '')?.nome;
           if (nome) anunciar(`Agora: ${nome}`);
         }}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div ref={palco} className="grid gap-3 sm:grid-cols-2">
         <Espaco
           titulo="AGORA"
           cor="var(--color-acao)"
+          posicao={estado.indice}
           figurinha={figurinhaPorId(passoAtual(estado) ?? '')}
           aoTocar={(nome) => anunciar(`Agora: ${nome}`)}
         />
         <Espaco
           titulo="DEPOIS"
           cor="var(--color-urgencia)"
+          posicao={estado.indice + 1}
           figurinha={figurinhaPorId(passoSeguinte(estado) ?? '')}
           aoTocar={(nome) => anunciar(`Depois: ${nome}`)}
         />
@@ -172,10 +230,13 @@ export function AgoraEDepois({ som }: { som: boolean }) {
       <div className="flex flex-wrap justify-center gap-2">
         {noVoluntario ? (
           <>
-            <BotaoSecundario rotulo="Passo anterior" aoTocar={() => guardar(voltar(estado))} />
+            <BotaoSecundario
+              rotulo="Passo anterior"
+              aoTocar={() => guardarComTravessia(voltar(estado))}
+            />
             <BotaoSecundario
               rotulo="Recomeçar rotina"
-              aoTocar={() => guardar(irPara(estado, 0))}
+              aoTocar={() => guardarComTravessia(irPara(estado, 0))}
             />
             <BotaoSecundario
               rotulo={montando ? 'Concluir montagem' : 'Montar rotina'}
@@ -224,15 +285,25 @@ function FaixaDaRotina({
               onClick={() => aoEscolher(i)}
               aria-current={atual ? 'step' : undefined}
               aria-label={`Ir para ${figurinhaPorId(id)?.nome}`}
-              className="rounded-full border-2 px-3 py-1 text-sm font-bold"
+              className="relative rounded-full border-2 px-3 py-1 text-sm font-bold"
               style={{
                 borderColor: atual ? 'transparent' : 'var(--color-linha)',
-                background: atual ? 'var(--color-texto)' : 'transparent',
                 color: atual ? 'var(--color-fundo)' : 'var(--color-texto-suave)',
                 textDecoration: cumprido ? 'line-through' : undefined,
               }}
             >
-              {figurinhaPorId(id)?.nome ?? id}
+              {/* `layoutId` compartilhado: a marca do passo atual desliza até o
+                  próximo em vez de apagar aqui e acender lá — o avanço da
+                  rotina fica visível na faixa, e não só nos dois quadros. */}
+              {atual && (
+                <motion.span
+                  layoutId="passo-atual"
+                  className="absolute inset-0 rounded-full"
+                  style={{ background: 'var(--color-texto)' }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+                />
+              )}
+              <span className="relative z-10">{figurinhaPorId(id)?.nome ?? id}</span>
             </button>
           </li>
         );
@@ -248,11 +319,14 @@ function FaixaDaRotina({
 function Espaco({
   titulo,
   cor,
+  posicao,
   figurinha,
   aoTocar,
 }: {
   titulo: string;
   cor: string;
+  /** Passo da rotina que este quadro mostra — a identidade que o Flip segue. */
+  posicao: number;
   figurinha: Figurinha | undefined;
   aoTocar: (nome: string) => void;
 }) {
@@ -262,13 +336,15 @@ function Espaco({
       onClick={() => figurinha && aoTocar(figurinha.nome)}
       whileTap={{ scale: 0.97 }}
       aria-label={`${titulo}${figurinha ? `: ${figurinha.nome}` : ', vazio'}`}
-      className="grid grid-rows-[auto_1fr_auto] justify-items-center gap-3 rounded-[1.75rem] border-[6px] p-4"
+      className="grid grid-rows-[auto_1fr] justify-items-center gap-3 rounded-[1.75rem] border-[6px] p-4"
       style={{
         borderColor: cor,
         background: 'var(--color-superficie)',
         boxShadow: 'var(--sombra-card)',
       }}
     >
+      {/* O rótulo é do quadro, não da atividade: fica parado enquanto a
+          figurinha atravessa. */}
       <span
         className="rounded-full px-4 py-1 text-sm font-extrabold tracking-widest"
         style={{ background: cor, color: '#ffffff' }}
@@ -276,18 +352,30 @@ function Espaco({
         {titulo}
       </span>
 
-      <span className="grid h-28 place-items-center sm:h-44">
-        {figurinha ? (
-          <FiguraGrande figurinha={figurinha} />
-        ) : (
-          <span className="text-base font-bold" style={{ color: 'var(--color-texto-suave)' }}>
-            vazio
-          </span>
-        )}
-      </span>
+      {/* Figura e nome viajam juntos: o nome pertence à atividade, e vê-lo
+          trocar sozinho enquanto a figura ainda está a caminho desmancharia a
+          ideia de que é a mesma coisa mudando de lugar. */}
+      {/* `data-flip-id` é como o Flip reconhece que a figurinha do quadro DEPOIS
+          e a do quadro AGORA são a mesma coisa. Sem ele, o Flip compara os
+          elementos pela posição no DOM — e como cada quadro mantém o seu nó e
+          só troca o conteúdo, ele concluiria que nada se moveu. */}
+      <span
+        data-flip-id={figurinha ? posicao : undefined}
+        className="grid grid-rows-[1fr_auto] justify-items-center gap-3"
+      >
+        <span className="grid h-28 place-items-center sm:h-44">
+          {figurinha ? (
+            <FiguraGrande figurinha={figurinha} />
+          ) : (
+            <span className="text-base font-bold" style={{ color: 'var(--color-texto-suave)' }}>
+              vazio
+            </span>
+          )}
+        </span>
 
-      <span className="flex h-9 items-center text-center text-xl font-extrabold sm:h-11 sm:text-2xl">
-        {figurinha?.nome ?? ''}
+        <span className="flex h-9 items-center text-center text-xl font-extrabold sm:h-11 sm:text-2xl">
+          {figurinha?.nome ?? ''}
+        </span>
       </span>
     </motion.button>
   );

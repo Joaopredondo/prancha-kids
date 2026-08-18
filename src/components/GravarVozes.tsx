@@ -25,6 +25,8 @@ export function GravarVozes() {
   const [erro, setErro] = useState<string | null>(null);
   const gravador = useRef<MediaRecorder | null>(null);
   const limite = useRef<number | undefined>(undefined);
+  /** Microfone aberto agora — o que a onda desenha. */
+  const [entradaAtiva, setEntradaAtiva] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     void listarChaves().then((chaves) =>
@@ -46,6 +48,7 @@ export function GravarVozes() {
     window.clearTimeout(limite.current);
     setGravando(null);
     setPedindo(null);
+    setEntradaAtiva(null);
   };
 
   const comecar = async (card: Card) => {
@@ -77,7 +80,10 @@ export function GravarVozes() {
     const tipo = formatoSuportado();
     const recorder = new MediaRecorder(entrada, tipo ? { mimeType: tipo } : undefined);
 
-    const soltarMicrofone = () => entrada.getTracks().forEach((faixa) => faixa.stop());
+    const soltarMicrofone = () => {
+      entrada.getTracks().forEach((faixa) => faixa.stop());
+      setEntradaAtiva(null);
+    };
 
     recorder.ondataavailable = (evento) => {
       if (evento.data.size > 0) pedacos.push(evento.data);
@@ -123,6 +129,7 @@ export function GravarVozes() {
     recorder.start();
     setPedindo(null);
     setGravando(card.id);
+    setEntradaAtiva(entrada);
 
     // Trava de segurança: ninguém grava uma palavra por 30 segundos, e
     // gravação esquecida mantém o microfone aberto.
@@ -184,7 +191,7 @@ export function GravarVozes() {
             <li
               key={card.id}
               data-classe={card.classe}
-              className="flex items-center gap-2 rounded-2xl border-2 px-3 py-2"
+              className="flex flex-wrap items-center gap-2 rounded-2xl border-2 px-3 py-2"
               style={{ borderColor: temVoz ? 'var(--color-acao)' : 'var(--color-linha)' }}
             >
               <span aria-hidden="true" className="text-2xl leading-none">
@@ -239,10 +246,84 @@ export function GravarVozes() {
                   ✕
                 </button>
               )}
+
+              {estaGravando && <Onda entrada={entradaAtiva} />}
             </li>
           );
         })}
       </ul>
     </div>
+  );
+}
+
+/**
+ * A voz desenhada enquanto entra.
+ *
+ * Gravar sem ver nada acontecendo não distingue "microfone mudo" de "estou
+ * falando baixo" — e a pessoa só descobre depois de gravar, ouvir e ter que
+ * regravar. A onda responde isso durante, que é quando ainda dá para corrigir.
+ *
+ * Desenha o próprio sinal do microfone: não é animação em cima do áudio, é o
+ * áudio. Por isso não passa por `prefers-reduced-motion` — parar de mexer aqui
+ * seria apagar a informação, não acalmar a tela.
+ */
+function Onda({ entrada }: { entrada: MediaStream | null }) {
+  const tela = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = tela.current;
+    if (!entrada || !canvas) return;
+
+    const contexto = canvas.getContext('2d');
+    const audio = new AudioContext();
+    const analisador = audio.createAnalyser();
+    analisador.fftSize = 1024;
+    audio.createMediaStreamSource(entrada).connect(analisador);
+
+    const amostras = new Uint8Array(analisador.frequencyBinCount);
+    let quadro = 0;
+
+    const desenhar = () => {
+      quadro = requestAnimationFrame(desenhar);
+      if (!contexto) return;
+
+      // O canvas acompanha o tamanho real na tela; sem isto a onda estica em
+      // telas de densidade diferente.
+      const largura = (canvas.width = canvas.clientWidth * devicePixelRatio);
+      const altura = (canvas.height = canvas.clientHeight * devicePixelRatio);
+
+      analisador.getByteTimeDomainData(amostras);
+      contexto.clearRect(0, 0, largura, altura);
+      contexto.lineWidth = 2 * devicePixelRatio;
+      contexto.strokeStyle =
+        getComputedStyle(canvas).getPropertyValue('--borda').trim() || '#dc2626';
+      contexto.beginPath();
+
+      for (let i = 0; i < amostras.length; i += 1) {
+        // 128 é o silêncio no domínio do tempo; o desvio dele é a voz.
+        const y = (amostras[i] / 128) * (altura / 2);
+        const x = (i / amostras.length) * largura;
+        if (i === 0) contexto.moveTo(x, y);
+        else contexto.lineTo(x, y);
+      }
+
+      contexto.stroke();
+    };
+
+    desenhar();
+
+    return () => {
+      cancelAnimationFrame(quadro);
+      void audio.close();
+    };
+  }, [entrada]);
+
+  return (
+    <canvas
+      ref={tela}
+      aria-hidden="true"
+      className="h-10 w-full rounded-lg"
+      style={{ background: 'var(--color-fundo)' }}
+    />
   );
 }

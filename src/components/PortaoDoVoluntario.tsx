@@ -128,16 +128,29 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
         {/* O conteúdo sobe para o alto: a metade de baixo é palco do card que
             gira, e texto por cima dele não se lê. */}
         <div className="relative z-10 flex h-full flex-col justify-center gap-6 px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))] lg:justify-start lg:px-10 lg:pt-24">
+          {/* Véu atrás do texto, não à frente da cena: os cards continuam
+              passando por aqui: prender o voo deles ao texto tiraria o que a
+              cena tem de vivo. O que muda é o contraste embaixo da letra —
+              um degradê que morre antes da borda, para não virar uma caixa. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 w-full max-w-xl"
+            style={{
+              background:
+                'radial-gradient(120% 60% at 0% 38%, color-mix(in oklab, var(--color-fundo) 86%, transparent) 0%, color-mix(in oklab, var(--color-fundo) 62%, transparent) 45%, transparent 78%)',
+            }}
+          />
+
           <motion.div
             initial={semMovimento ? false : { opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
-            className="flex items-center gap-3"
+            className="relative flex items-center gap-3"
           >
             <img src={logo} alt="" aria-hidden="true" className="size-14 rounded-2xl sm:size-16" />
             <div>
               <p className="text-2xl font-extrabold leading-tight sm:text-3xl">Prancha Kids</p>
-              <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-texto)' }}>
                 2ª IPI · Ministério Infantil
               </p>
             </div>
@@ -147,8 +160,8 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
             initial={semMovimento ? false : { opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.05 }}
-            className="max-w-sm text-base leading-relaxed"
-            style={{ color: 'var(--color-texto-suave)' }}
+            className="relative max-w-sm text-base font-semibold leading-relaxed"
+            style={{ color: 'var(--color-texto)' }}
           >
             A prancha é da criança e nunca pede senha. Esta parte é do voluntário: ficha do
             culto, frequência e cadastro.

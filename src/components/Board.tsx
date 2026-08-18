@@ -4,10 +4,11 @@ import { CardButton } from './CardButton';
 interface Props {
   cards: Card[];
   cardAtivo: string | null;
+  cardFalando: string | null;
   onTocar: (card: Card) => void;
 }
 
-export function Board({ cards, cardAtivo, onTocar }: Props) {
+export function Board({ cards, cardAtivo, cardFalando, onTocar }: Props) {
   return (
     <div
       className="grid gap-3 px-3 pb-6 sm:gap-4 sm:px-4"
@@ -20,6 +21,7 @@ export function Board({ cards, cardAtivo, onTocar }: Props) {
           key={card.id}
           card={card}
           ativo={cardAtivo === card.id}
+          falando={cardFalando === card.id}
           onTocar={onTocar}
         />
       ))}

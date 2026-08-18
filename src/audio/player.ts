@@ -16,6 +16,24 @@ let pendente: string | null = null;
 
 let vozPt: SpeechSynthesisVoice | null = null;
 
+/**
+ * Cada toque invalida o anterior.
+ *
+ * `tocarCard` corta o que estava tocando, e o corte dispara o "terminou" do som
+ * antigo. Sem este contador, tocar dois cards em seguida faria o primeiro
+ * avisar que acabou **depois** de o segundo começar — e quem escuta esse aviso
+ * (o anel que pulsa no card) apagaria o card errado.
+ */
+let geracao = 0;
+
+/** Envolve o aviso de fim para que só o toque mais recente consiga dá-lo. */
+function avisoDeFim(aoTerminar?: () => void) {
+  const minha = geracao;
+  return () => {
+    if (minha === geracao) aoTerminar?.();
+  };
+}
+
 function escolherVoz() {
   if (!('speechSynthesis' in window)) return;
   const vozes = speechSynthesis.getVoices();
@@ -38,12 +56,18 @@ export function desbloquearAudio() {
   if (Howler.ctx?.state === 'suspended') void Howler.ctx.resume();
 }
 
-function falar(texto: string) {
-  if (!('speechSynthesis' in window)) return;
+function falar(texto: string, aoTerminar?: () => void) {
+  if (!('speechSynthesis' in window)) {
+    aoTerminar?.();
+    return;
+  }
   const fala = new SpeechSynthesisUtterance(texto);
   fala.lang = 'pt-BR';
   fala.rate = 0.9;
   if (vozPt) fala.voice = vozPt;
+  const fim = avisoDeFim(aoTerminar);
+  fala.onend = fim;
+  fala.onerror = fim;
   speechSynthesis.speak(fala);
 }
 
@@ -57,12 +81,16 @@ export function falarTexto(texto: string) {
   falar(texto);
 }
 
+/** Quem espera o fim do card cujo áudio ainda estava carregando. */
+let fimPendente: (() => void) | undefined;
+
 function semSomDisponivel(card: Card) {
   semArquivo.add(card.id);
   sons.delete(card.id);
   if (pendente === card.id) {
     pendente = null;
-    falar(falaDoCard(card));
+    falar(falaDoCard(card), fimPendente);
+    fimPendente = undefined;
   }
 }
 
@@ -88,26 +116,43 @@ function obterSom(card: Card): Howl {
 /**
  * Toca o nome do card, na ordem: gravação feita no aparelho, MP3 do app, voz do
  * navegador. A gravação vem primeiro porque é a voz que a criança conhece.
+ *
+ * @param aoTerminar Avisado quando a fala acaba, por qualquer um dos três
+ * caminhos. Serve ao card mostrar que **está falando** — no tablet da igreja o
+ * volume vive baixo, e sem esse sinal card com som e card mudo são idênticos na
+ * tela. Só o toque mais recente consegue avisar.
  */
-export function tocarCard(card: Card) {
+export function tocarCard(card: Card, aoTerminar?: () => void) {
   // Corta o que estava tocando: toques rápidos não podem sobrepor.
   Howler.stop();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   pendente = null;
+  fimPendente = undefined;
+  geracao += 1;
+
+  const fim = avisoDeFim(aoTerminar);
 
   const gravada = vozes.get(card.id);
   if (gravada) {
-    new Audio(gravada).play().catch(() => falar(falaDoCard(card)));
+    const audio = new Audio(gravada);
+    audio.onended = fim;
+    audio.play().catch(() => falar(falaDoCard(card), aoTerminar));
     return;
   }
 
   if (!temAudio(card.id) || semArquivo.has(card.id)) {
-    falar(falaDoCard(card));
+    falar(falaDoCard(card), aoTerminar);
     return;
   }
 
   pendente = card.id;
-  obterSom(card).play();
+  // Guardado à parte porque, se o MP3 falhar ao carregar, quem termina é a voz
+  // do navegador — e ela precisa herdar o mesmo aviso.
+  fimPendente = aoTerminar;
+
+  const som = obterSom(card);
+  som.once('end', fim);
+  som.play();
 }
 
 /** Carrega as gravações do aparelho para o toque sair sem espera. */

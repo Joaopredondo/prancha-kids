@@ -24,7 +24,7 @@ export async function criarCelebracao(canvas: HTMLCanvasElement): Promise<Celebr
 
   const cena = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-  camera.position.set(0, 0.4, 9);
+  camera.position.set(0, 0.4, 11);
   camera.lookAt(0, 0.4, 0);
 
   cena.add(new THREE.AmbientLight('#ffffff', 1.4));
@@ -47,11 +47,14 @@ export async function criarCelebracao(canvas: HTMLCanvasElement): Promise<Celebr
   // centímetros, origem no canto…). Normalizar pela altura real, em vez de um
   // fator de escala chutado, é o que evita o balão gigante ou o troféu
   // minúsculo dependendo de qual arquivo a pessoa baixou.
-  normalizarTamanho(trofeu, 3.2);
+  // A altura é normalizada, mas a largura não: este troféu é mais atarracado
+  // que o anterior e, na mesma altura, transbordava o quadro. O número é o que
+  // deixa a taça inteira — alças incluídas — dentro da tela.
+  normalizarTamanho(trofeu, 2.5);
   trofeu.position.set(0, 3.5, 0);
   cena.add(trofeu);
 
-  normalizarTamanho(baloes, 2.4);
+  normalizarTamanho(baloes, 2);
   baloes.position.set(0, -5, -1.5);
   cena.add(baloes);
 
