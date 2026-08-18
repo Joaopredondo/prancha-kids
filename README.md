@@ -130,6 +130,17 @@ por isso não existe requisição 404 para arquivo que ainda não foi feito. Em
 **Depois de adicionar assets, rode `npm run build` de novo** para eles entrarem no
 cache offline.
 
+## Créditos de terceiros
+
+`public/models/` traz dois modelos 3D usados na tela de "ficha salva"
+(`src/three/celebracao.ts`), ambos Creative Commons Attribution — exigem
+crédito ao autor, que fica registrado aqui:
+
+- `trofeu.glb` — [Trophy](https://poly.pizza/m/6Xu7mttjodo) por **Casey
+  Tumbers**, via Poly Pizza (CC BY 3.0).
+- `baloes.glb` — [3D Cartoon Balloons](https://sketchfab.com/3d-models/3d-cartoon-balloons-388a97e1eebd463aa202451d44a204b6)
+  por **Skill Artist**, via Sketchfab (CC Attribution).
+
 ## Deploy
 
 Hospedado na **Vercel**, ligado ao repositório: todo push na `main` publica em
@@ -147,5 +158,5 @@ git switch main && git merge minha-mudanca && git push
 
 ## Stack
 
-Vite · React 19 · TypeScript · Tailwind CSS v4 · Howler.js · Motion ·
-vite-plugin-pwa (Workbox) · Nunito (fonte local, sem CDN).
+Vite · React 19 · TypeScript · Tailwind CSS v4 · Howler.js · Motion · Three.js ·
+GSAP · vite-plugin-pwa (Workbox) · Nunito (fonte local, sem CDN).
