@@ -132,14 +132,15 @@ cache offline.
 
 ## Créditos de terceiros
 
-`public/models/` traz dois modelos 3D usados na tela de "ficha salva"
-(`src/three/celebracao.ts`), ambos Creative Commons Attribution — exigem
-crédito ao autor, que fica registrado aqui:
+`public/models/` traz os modelos 3D da tela de "ficha salva"
+(`src/three/celebracao.ts`):
 
-- `trofeu.glb` — [Trophy](https://poly.pizza/m/6Xu7mttjodo) por **Casey
-  Tumbers**, via Poly Pizza (CC BY 3.0).
+- `trofeu.glb` — gerado no **Higgsfield** (`tripo_3d`), nas cores do próprio
+  app: taça amarela e base verde, do código Fitzgerald. Sem exigência de
+  atribuição.
 - `baloes.glb` — [3D Cartoon Balloons](https://sketchfab.com/3d-models/3d-cartoon-balloons-388a97e1eebd463aa202451d44a204b6)
-  por **Skill Artist**, via Sketchfab (CC Attribution).
+  por **Skill Artist**, via Sketchfab. **Creative Commons Attribution** — o
+  crédito ao autor é obrigatório e é por isso que ele está aqui.
 
 ## Deploy
 

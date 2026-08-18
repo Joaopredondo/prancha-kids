@@ -1,11 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useReducedMotion } from 'motion/react';
+import gsap from 'gsap';
 import { ROTULOS } from '../dados/ficha';
-import { diasComFicha, listarFichas } from '../dados/fichas';
+import { diaDaFicha, diasComFicha, listarFichas } from '../dados/fichas';
 import { presencasDoDia, resumirTodas } from '../dados/frequencia';
 import { listarPerfis } from '../dados/perfis';
 import { Retrato } from './SeletorDeCrianca';
 
 const formatarDia = (dia: string) => new Date(`${dia}T12:00`).toLocaleDateString('pt-BR');
+
+/** Rótulo curto do dia, para caber embaixo do quadradinho da faixa. */
+const diaCurto = (dia: string) =>
+  new Date(`${dia}T12:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
 /**
  * Frequência do ministério, montada a partir das fichas salvas.
@@ -22,6 +28,25 @@ export function Frequencia() {
 
   const [dia, setDia] = useState<string>('');
   const doDia = useMemo(() => (dia ? presencasDoDia(fichas, dia) : []), [fichas, dia]);
+
+  /**
+   * Em que dias cada criança tem ficha.
+   *
+   * A faixa é lida da esquerda (culto mais antigo) para a direita (mais
+   * recente), ao contrário de `dias`, que vem do mais recente. Sequência de
+   * falta só faz sentido lida no sentido do tempo.
+   */
+  const diasEmOrdem = useMemo(() => [...dias].reverse(), [dias]);
+  const presencaPorPerfil = useMemo(() => {
+    const mapa = new Map<string, Set<string>>();
+    for (const ficha of fichas) {
+      if (!ficha.perfilId) continue;
+      const dela = mapa.get(ficha.perfilId) ?? new Set<string>();
+      dela.add(diaDaFicha(ficha));
+      mapa.set(ficha.perfilId, dela);
+    }
+    return mapa;
+  }, [fichas]);
 
   if (fichas.length === 0) {
     return (
@@ -61,6 +86,11 @@ export function Frequencia() {
                       resumo.estadoMaisComum as keyof typeof ROTULOS.estado
                     ].toLowerCase()}`}
                 </p>
+                <FaixaDePresenca
+                  dias={diasEmOrdem}
+                  presentes={presencaPorPerfil.get(resumo.perfil.id) ?? new Set()}
+                  nome={resumo.perfil.nome || 'Sem nome'}
+                />
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -129,6 +159,80 @@ export function Frequencia() {
         )}
       </Bloco>
     </div>
+  );
+}
+
+/**
+ * Um quadradinho por culto: cheio quando veio, vazio quando faltou.
+ *
+ * A mesma informação já estava escrita ("3 de 7"), mas em prosa ela não mostra
+ * o que a coordenação precisa ver — **onde** estão as faltas. Três faltas
+ * espalhadas em três meses e três faltas seguidas dão o mesmo número e
+ * significam coisas diferentes.
+ *
+ * Não é gráfico de desempenho da criança: é registro de quem esteve presente,
+ * como o resto da tela. Ver `dados/frequencia.ts`.
+ */
+function FaixaDePresenca({
+  dias,
+  presentes,
+  nome,
+}: {
+  dias: string[];
+  presentes: Set<string>;
+  nome: string;
+}) {
+  const faixa = useRef<HTMLUListElement>(null);
+  const semMovimento = useReducedMotion();
+
+  useEffect(() => {
+    if (semMovimento || !faixa.current) return;
+    const marcas = faixa.current.querySelectorAll('[data-culto]');
+    // Entram na ordem do tempo, uma atrás da outra: a faixa se escreve da
+    // esquerda para a direita, que é o sentido em que ela é lida.
+    //
+    // `fromTo`, e não `from`: o efeito roda duas vezes em desenvolvimento
+    // (StrictMode) e um `from` interrompido deixa o quadradinho parado no
+    // estado inicial — a segunda passada então anima de invisível para
+    // invisível, e a faixa inteira some.
+    const animacao = gsap.fromTo(
+      marcas,
+      { scaleY: 0.2, opacity: 0 },
+      { scaleY: 1, opacity: 1, duration: 0.3, ease: 'power2.out', stagger: 0.025 },
+    );
+    return () => {
+      animacao.revert();
+    };
+  }, [semMovimento, dias.length]);
+
+  if (dias.length === 0) return null;
+
+  return (
+    <ul
+      ref={faixa}
+      className="mt-2 flex flex-wrap gap-1"
+      aria-label={`Presença de ${nome} por culto, do mais antigo ao mais recente`}
+    >
+      {dias.map((dia) => {
+        const veio = presentes.has(dia);
+        return (
+          <li
+            key={dia}
+            data-culto
+            title={`${formatarDia(dia)} — ${veio ? 'veio' : 'faltou'}`}
+            className="h-5 w-3 rounded-[3px] border-2 origin-bottom"
+            style={{
+              borderColor: veio ? 'var(--color-acao)' : 'var(--color-linha)',
+              background: veio ? 'var(--color-acao)' : 'transparent',
+            }}
+          >
+            <span className="sr-only">
+              {diaCurto(dia)}: {veio ? 'veio' : 'faltou'}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

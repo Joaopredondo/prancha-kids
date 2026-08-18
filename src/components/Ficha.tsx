@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useReducedMotion } from 'motion/react';
+import gsap from 'gsap';
 import {
   ALIMENTACOES,
   COMUNICACOES,
@@ -16,6 +18,8 @@ import {
   alternarUnico,
   fichaVazia,
   type Ficha as TipoDaFicha,
+  type Marcacao,
+  type TipoDeMarcacao,
 } from '../dados/ficha';
 import {
   apagarFicha,
@@ -327,6 +331,8 @@ export function Ficha() {
 
         {(ficha.marcacoes ?? []).length > 0 && (
           <>
+            <LinhaDoTempo marcacoes={ficha.marcacoes ?? []} />
+
             <ul className="flex flex-col gap-2">
               {(ficha.marcacoes ?? []).map((marcacao, i) => (
                 <li
@@ -553,6 +559,91 @@ export function Ficha() {
       )}
 
       <Celebracao aberto={comemorando} aoFechar={() => setComemorando(false)} />
+    </div>
+  );
+}
+
+/** Cor de cada marcação: a mesma leitura de cor que os cards já usam. */
+const COR_DA_MARCACAO: Record<TipoDeMarcacao, string> = {
+  crise: 'var(--color-urgencia)',
+  acalmou: 'var(--color-acao)',
+  saiu: 'var(--color-descricao)',
+  voltou: 'var(--color-acao)',
+  lanche: 'var(--color-coisa)',
+  banheiro: 'var(--color-descricao)',
+};
+
+/**
+ * Os carimbos de hora dispostos ao longo do culto.
+ *
+ * A lista abaixo responde "o que aconteceu"; ela não responde **quando dentro
+ * do culto** — e é essa a pergunta que muda o manejo do voluntário. "Crise
+ * sempre no começo do louvor" só aparece quando as marcações são vistas
+ * espaçadas no tempo, não empilhadas em linhas de altura igual.
+ *
+ * A régua vai da primeira à última marcação, não de um horário fixo de culto:
+ * o app não sabe quando o culto começou, e inventar isso deslocaria tudo.
+ */
+function LinhaDoTempo({ marcacoes }: { marcacoes: Marcacao[] }) {
+  const trilho = useRef<HTMLDivElement>(null);
+  const semMovimento = useReducedMotion();
+
+  const horas = marcacoes.map((m) => m.hora);
+  const inicio = Math.min(...horas);
+  const fim = Math.max(...horas);
+  const duracao = fim - inicio;
+
+  useEffect(() => {
+    if (semMovimento || !trilho.current) return;
+    // `fromTo` em vez de `from`: em desenvolvimento o efeito roda duas vezes, e
+    // um `from` interrompido deixaria as marcas presas em escala zero.
+    const animacao = gsap.fromTo(
+      trilho.current.querySelectorAll('[data-marca]'),
+      { scale: 0, opacity: 0 },
+      { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(2)', stagger: 0.05 },
+    );
+    return () => {
+      animacao.revert();
+    };
+  }, [semMovimento, marcacoes.length]);
+
+  const relogio = (hora: number) =>
+    new Date(hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        ref={trilho}
+        className="relative h-12 rounded-full border-2"
+        style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+      >
+        {marcacoes.map((marcacao, i) => (
+          <span
+            key={`${marcacao.hora}-${i}`}
+            data-marca
+            title={`${relogio(marcacao.hora)} — ${ROTULOS_DE_MARCACAO[marcacao.tipo]}`}
+            className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+            style={{
+              // Uma marcação só, ou várias no mesmo minuto: fica no meio em vez
+              // de dividir por zero e sumir na borda.
+              left: duracao > 0 ? `${((marcacao.hora - inicio) / duracao) * 92 + 4}%` : '50%',
+              borderColor: 'var(--color-superficie)',
+              background: COR_DA_MARCACAO[marcacao.tipo],
+            }}
+          >
+            <span className="sr-only">
+              {relogio(marcacao.hora)} {ROTULOS_DE_MARCACAO[marcacao.tipo]}
+            </span>
+          </span>
+        ))}
+      </div>
+      <div
+        className="flex justify-between text-xs font-bold tabular-nums"
+        style={{ color: 'var(--color-texto-suave)' }}
+      >
+        <span>{relogio(inicio)}</span>
+        {duracao > 0 && <span>{relogio(fim)}</span>}
+      </div>
     </div>
   );
 }
