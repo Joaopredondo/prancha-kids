@@ -35,6 +35,9 @@ const Frequencia = lazy(() =>
 const GravarVozes = lazy(() =>
   import('./components/GravarVozes').then((m) => ({ default: m.GravarVozes })),
 );
+const PainelDoMinisterio = lazy(() =>
+  import('./components/PainelDoMinisterio').then((m) => ({ default: m.PainelDoMinisterio })),
+);
 
 export default function App() {
   const { prefs, definir } = usePrefs();
@@ -102,7 +105,8 @@ export default function App() {
     });
   };
 
-  const areaProtegida = vista === 'ficha' || vista === 'frequencia' || vista === 'vozes';
+  const areaProtegida =
+    vista === 'ficha' || vista === 'frequencia' || vista === 'vozes' || vista === 'ministerio';
 
   /**
    * Tela cheia, sem cabeçalho nem menu: é uma barreira, e barreira com o menu
@@ -188,6 +192,7 @@ export default function App() {
                 {vista === 'ficha' && <Ficha />}
                 {vista === 'frequencia' && <Frequencia />}
                 {vista === 'vozes' && <GravarVozes />}
+                {vista === 'ministerio' && <PainelDoMinisterio aoVoltar={() => setVista('prancha')} />}
               </Suspense>
             </motion.div>
           </AnimatePresence>
@@ -206,6 +211,7 @@ export default function App() {
           setDepoisDeEntrar(vista);
           setVista('login');
         }}
+        onEquipe={() => setVista('ministerio')}
       />
     </div>
   );

@@ -20,6 +20,7 @@ interface Props {
   onFechar: () => void;
   onGravarVozes: () => void;
   onEntrar: () => void;
+  onEquipe: () => void;
 }
 
 const TAMANHOS: { id: TamanhoCard; label: string }[] = [
@@ -43,7 +44,15 @@ const LEGENDA: { classe: Classe; label: string }[] = [
   { classe: 'urgencia', label: 'Parar / não' },
 ];
 
-export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVozes, onEntrar }: Props) {
+export function SettingsSheet({
+  aberto,
+  prefs,
+  onDefinir,
+  onFechar,
+  onGravarVozes,
+  onEntrar,
+  onEquipe,
+}: Props) {
   useEffect(() => {
     if (!aberto) return;
     const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
@@ -140,6 +149,10 @@ export function SettingsSheet({ aberto, prefs, onDefinir, onFechar, onGravarVoze
             <Conta
               onEntrar={() => {
                 onEntrar();
+                onFechar();
+              }}
+              onEquipe={() => {
+                onEquipe();
                 onFechar();
               }}
             />
