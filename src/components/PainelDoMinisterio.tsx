@@ -3,6 +3,7 @@ import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import { BotaoSegurar } from './BotaoSegurar';
+import { listarAtividade, listarUltimoAcesso, type EventoDaEquipe } from '../dados/atividade';
 import {
   cancelarConvite,
   listarEquipe,
@@ -67,6 +68,19 @@ function iniciais(nome: string): string {
 }
 
 const formatarData = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
+
+/** "há 2 min", "há 3h", "ontem", "há 5 dias" — depois disso vira data mesmo. */
+function tempoRelativo(iso: string): string {
+  const minutos = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (minutos < 1) return 'agora';
+  if (minutos < 60) return `há ${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `há ${horas}h`;
+  const dias = Math.floor(horas / 24);
+  if (dias === 1) return 'ontem';
+  if (dias < 7) return `há ${dias} dias`;
+  return formatarData(iso);
+}
 
 /**
  * Ícones desta tela, em SVG — não emoji. É a única tela de adulto do app: o
@@ -162,6 +176,10 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   /** Linha que o servidor acabou de confirmar — dispara o pulso do GSAP. */
   const [confirmada, setConfirmada] = useState<string | null>(null);
 
+  /** Só a coordenação carrega isto — a RLS recusaria pro voluntário mesmo assim. */
+  const [atividade, setAtividade] = useState<EventoDaEquipe[] | null>(null);
+  const [ultimoAcesso, setUltimoAcesso] = useState<Map<string, string | null> | null>(null);
+
   const [emailConvite, setEmailConvite] = useState('');
   const [papelConvite, setPapelConvite] = useState<Papel>('voluntario');
   const [convidando, setConvidando] = useState(false);
@@ -220,6 +238,23 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    if (!vinculo || vinculo.papel !== 'coordenador') return;
+    let vivo = true;
+    void (async () => {
+      const [dosEventos, doAcesso] = await Promise.all([
+        listarAtividade(vinculo.ministerioId),
+        listarUltimoAcesso(vinculo.ministerioId),
+      ]);
+      if (!vivo) return;
+      if (dosEventos.dados) setAtividade(dosEventos.dados);
+      if (doAcesso.dados) setUltimoAcesso(doAcesso.dados);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [vinculo]);
 
   const souCoordenador = vinculo?.papel === 'coordenador';
 
@@ -422,6 +457,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                 emVoo={emVoo}
                 confirmada={confirmada}
                 semMovimento={Boolean(semMovimento)}
+                ultimoAcesso={ultimoAcesso}
                 aoMudarPapel={aoMudarPapel}
                 aoRemover={aoRemover}
               />
@@ -434,6 +470,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                 emVoo={emVoo}
                 confirmada={confirmada}
                 semMovimento={Boolean(semMovimento)}
+                ultimoAcesso={ultimoAcesso}
                 aoMudarPapel={aoMudarPapel}
                 aoRemover={aoRemover}
               />
@@ -506,6 +543,13 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                   </AnimatePresence>
                 </ul>
               </Secao>
+            )}
+
+            {souCoordenador && (
+              <AtividadeRecente
+                eventos={atividade}
+                nomePorUsuario={new Map(equipe.membros.map((m) => [m.usuarioId, m.nome]))}
+              />
             )}
           </>
         )}
@@ -681,6 +725,7 @@ function GrupoDeMembros({
   emVoo,
   confirmada,
   semMovimento,
+  ultimoAcesso,
   aoMudarPapel,
   aoRemover,
 }: {
@@ -691,6 +736,7 @@ function GrupoDeMembros({
   emVoo: Set<string>;
   confirmada: string | null;
   semMovimento: boolean;
+  ultimoAcesso: Map<string, string | null> | null;
   aoMudarPapel: (membro: Membro, papel: Papel) => void;
   aoRemover: (membro: Membro) => void;
 }) {
@@ -718,6 +764,7 @@ function GrupoDeMembros({
               emVoo={emVoo.has(membro.usuarioId)}
               pulsar={confirmada === membro.usuarioId}
               semMovimento={semMovimento}
+              ultimoAcesso={ultimoAcesso ? (ultimoAcesso.get(membro.usuarioId) ?? null) : undefined}
               aoMudarPapel={(proximo) => aoMudarPapel(membro, proximo)}
               aoRemover={() => aoRemover(membro)}
             />
@@ -734,6 +781,7 @@ function LinhaDeMembro({
   emVoo,
   pulsar,
   semMovimento,
+  ultimoAcesso,
   aoMudarPapel,
   aoRemover,
 }: {
@@ -742,6 +790,8 @@ function LinhaDeMembro({
   emVoo: boolean;
   pulsar: boolean;
   semMovimento: boolean;
+  /** `undefined` = ainda não carregou; `null` = carregou e a pessoa nunca entrou. */
+  ultimoAcesso?: string | null;
   aoMudarPapel: (papel: Papel) => void;
   aoRemover: () => void;
 }) {
@@ -822,6 +872,12 @@ function LinhaDeMembro({
           <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
             <span className="break-all">{membro.email}</span>
             <span className="whitespace-nowrap"> · desde {formatarData(membro.desde)}</span>
+            {ultimoAcesso !== undefined && (
+              <span className="whitespace-nowrap">
+                {' '}
+                · {ultimoAcesso ? `visto ${tempoRelativo(ultimoAcesso)}` : 'nunca entrou'}
+              </span>
+            )}
           </p>
         </div>
 
@@ -951,6 +1007,72 @@ function FormularioDeConvite({
         </motion.section>
       )}
     </AnimatePresence>
+  );
+}
+
+/**
+ * Ficha salva, criança cadastrada, voz gravada — os marcos que já significam
+ * algo no culto, com quem e quando ao lado. Não é telemetria de navegação.
+ */
+function AtividadeRecente({
+  eventos,
+  nomePorUsuario,
+}: {
+  eventos: EventoDaEquipe[] | null;
+  nomePorUsuario: Map<string, string>;
+}) {
+  return (
+    <Secao
+      titulo="Atividade recente"
+      quantidade={eventos?.length ?? 0}
+      cor="var(--color-pessoa)"
+      descricao="Ficha salva, criança cadastrada, voz gravada. Só os marcos que já significam algo."
+    >
+      {eventos === null ? (
+        <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+          Carregando…
+        </p>
+      ) : eventos.length === 0 ? (
+        <p
+          className="rounded-2xl border-2 border-dashed px-4 py-6 text-center text-sm"
+          style={{ borderColor: 'var(--color-linha)', color: 'var(--color-texto-suave)' }}
+        >
+          Nenhuma atividade registrada ainda.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {eventos.map((evento) => {
+            const nome = nomePorUsuario.get(evento.usuarioId) ?? 'alguém que já saiu da equipe';
+            const cor = corDoAvatar(evento.usuarioId);
+            return (
+              <li
+                key={evento.id}
+                className="flex items-center gap-3 rounded-2xl border-2 px-4 py-3"
+                style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="grid size-9 shrink-0 place-items-center rounded-full text-xs font-extrabold"
+                  style={{
+                    background: `color-mix(in oklab, ${cor} 18%, var(--color-superficie))`,
+                    color: cor,
+                    border: `2px solid color-mix(in oklab, ${cor} 45%, transparent)`,
+                  }}
+                >
+                  {iniciais(nome)}
+                </span>
+                <span className="min-w-40 flex-1">
+                  <span className="block text-sm font-bold">{evento.detalhe}</span>
+                  <span className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+                    {nome} · {tempoRelativo(evento.criadoEm)}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Secao>
   );
 }
 

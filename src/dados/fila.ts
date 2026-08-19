@@ -6,7 +6,7 @@
  * envio acontece quando houver rede.
  */
 
-export type Tabela = 'criancas' | 'fichas' | 'rotinas' | 'vozes';
+export type Tabela = 'criancas' | 'fichas' | 'rotinas' | 'vozes' | 'eventos';
 
 /** Valor reservado para a rotina do aparelho, sem criança escolhida. */
 export const ROTINA_GERAL = 'geral';

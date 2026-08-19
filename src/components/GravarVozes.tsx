@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { apagarArquivo, chaveDaVoz, listarChaves, salvarArquivo } from '../dados/arquivos';
+import { registrarEvento } from '../dados/eventos';
 import { enfileirar } from '../dados/fila';
 import { CARDS, falaDoCard } from '../data/cards';
 import { esquecerVoz, tocarCard } from '../audio/player';
@@ -114,6 +115,7 @@ export function GravarVozes() {
           // A voz é do ministério: sobe para os outros aparelhos não
           // precisarem regravar as mesmas palavras.
           enfileirar('vozes', card.id);
+          registrarEvento('voz', null, `Gravou: ${card.label}`);
           setComVoz((atual) => new Set(atual).add(card.id));
         } catch {
           // Armazenamento cheio ou navegação privada: precisa aparecer, senão

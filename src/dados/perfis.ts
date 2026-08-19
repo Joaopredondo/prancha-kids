@@ -1,3 +1,4 @@
+import { registrarEvento } from './eventos';
 import { enfileirar } from './fila';
 
 /**
@@ -83,6 +84,7 @@ export function salvarPerfil(perfil: Perfil): Perfil {
   perfis[perfil.id] = salvo;
   gravar(perfis);
   enfileirar('criancas', perfil.id);
+  registrarEvento('crianca', perfil.id, `Cadastro de ${perfil.nome || 'criança sem nome'}`);
   return salvo;
 }
 
