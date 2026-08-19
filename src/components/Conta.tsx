@@ -10,7 +10,13 @@ import { useSincronizacao } from '../hooks/useSincronizacao';
  * gravando no aparelho. A conta serve para, na fase seguinte, sincronizar as
  * fichas entre os voluntários.
  */
-export function Conta({ onEntrar }: { onEntrar: () => void }) {
+export function Conta({
+  onEntrar,
+  onEquipe,
+}: {
+  onEntrar: () => void;
+  onEquipe: () => void;
+}) {
   const { carregando, email, vinculo, saiuDaEquipe, recarregar } = useConta();
   const { pendentes, ocupado, ultimo, sincronizarAgora, enviarTudo } = useSincronizacao(
     vinculo?.ministerioId ?? null,
@@ -105,6 +111,15 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
         <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
           Última tentativa: {ultimo.erro} — o app tenta de novo sozinho.
         </p>
+      )}
+
+      {vinculo && (
+        <div className="mt-3">
+          <Botao
+            rotulo={vinculo.papel === 'coordenador' ? 'Gerenciar equipe' : 'Ver equipe'}
+            aoTocar={onEquipe}
+          />
+        </div>
       )}
 
       {vinculo?.papel === 'coordenador' && (
