@@ -4,11 +4,38 @@ import logo from '../assets/ipi.png';
 import { conferirPin, temPin } from '../dados/seguranca';
 import { entrar } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
+import { AceitarConvite } from './AceitarConvite';
+import { CampoDeTexto } from './CampoDeTexto';
 import { CenaDaPrancha } from './CenaDaPrancha';
 import type { Momento } from '../three/cenaDaPrancha';
 
-type Caminho = 'conta' | 'codigo';
+type Caminho = 'conta' | 'codigo' | 'convite';
 type Campo = 'email' | 'senha';
+
+/**
+ * O e-mail que veio no link do convite.
+ *
+ * Query string, e não `/convite`: o app não tem roteador, e um caminho novo
+ * dependeria de o servidor devolver o `index.html` para uma rota que não é
+ * arquivo. Com `?convite=`, o link funciona em qualquer hospedagem, sem
+ * configuração nenhuma.
+ *
+ * Some da barra de endereço depois de lido — o e-mail de alguém não precisa
+ * ficar no histórico do navegador nem viajar no cabeçalho de referência.
+ */
+function lerConviteDaUrl(): string {
+  try {
+    const url = new URL(window.location.href);
+    const email = url.searchParams.get('convite');
+    if (!email) return '';
+
+    url.searchParams.delete('convite');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    return email.trim().toLowerCase();
+  } catch {
+    return '';
+  }
+}
 
 interface Props {
   /** Chamado quando a pessoa provou que pode entrar. */
@@ -36,7 +63,13 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
   const comCodigo = temPin();
   const semMovimento = useReducedMotion();
 
-  const [caminho, setCaminho] = useState<Caminho>(comConta ? 'conta' : 'codigo');
+  // Lido uma vez, na montagem: a leitura limpa a query string, e repetir em
+  // cada render devolveria string vazia a partir da segunda vez.
+  const [emailDoConvite] = useState(lerConviteDaUrl);
+
+  const [caminho, setCaminho] = useState<Caminho>(
+    emailDoConvite && comConta ? 'convite' : comConta ? 'conta' : 'codigo',
+  );
   const [dados, setDados] = useState({ email: '', senha: '' });
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -184,7 +217,10 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
             </p>
           </div>
 
-          {comConta && (
+          {/* As abas somem durante o convite: ali a pessoa está num fluxo de
+              duas etapas, e uma aba ao lado convida a sair dele no meio. A
+              saída existe, mas como link discreto no fim do formulário. */}
+          {comConta && caminho !== 'convite' && (
             <div
               className="flex gap-1 rounded-full border-2 p-1"
               style={{ borderColor: 'var(--color-linha)' }}
@@ -209,7 +245,20 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
           )}
 
           <AnimatePresence mode="wait" initial={false}>
-          {caminho === 'conta' && comConta ? (
+          {caminho === 'convite' && comConta ? (
+            <AceitarConvite
+              key="convite"
+              emailDoLink={emailDoConvite}
+              semMovimento={Boolean(semMovimento)}
+              aoFocarCampo={setCampoFocado}
+              aoErrar={() => setTentativasErradas((n) => n + 1)}
+              aoEntrar={abrirAPorta}
+              aoDesistir={() => {
+                setCaminho('conta');
+                setErro(null);
+              }}
+            />
+          ) : caminho === 'conta' && comConta ? (
             <motion.form
               key="conta"
               initial={semMovimento ? false : { opacity: 0, y: 6 }}
@@ -222,7 +271,7 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                 void tentarConta();
               }}
             >
-              <Campo
+              <CampoDeTexto
                 rotulo="E-mail"
                 tipo="email"
                 autoCompletar="email"
@@ -240,7 +289,7 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                   setEmailInvalido(dados.email.length > 0 && !dados.email.includes('@'));
                 }}
               />
-              <Campo
+              <CampoDeTexto
                 rotulo="Senha"
                 tipo="password"
                 autoCompletar="current-password"
@@ -263,7 +312,18 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
               </button>
 
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-texto-suave)' }}>
-                Não há cadastro aberto: a coordenação convida por e-mail. Sem conta, use o{' '}
+                Não há cadastro aberto: a coordenação convida por e-mail.{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaminho('convite');
+                    setErro(null);
+                  }}
+                  className="cursor-pointer font-bold underline underline-offset-2"
+                >
+                  Recebi um convite
+                </button>
+                . Sem conta, use o{' '}
                 <button
                   type="button"
                   onClick={() => setCaminho('codigo')}
@@ -393,52 +453,5 @@ function Aba({ rotulo, ativa, aoTocar }: { rotulo: string; ativa: boolean; aoToc
       )}
       <span className="relative z-10">{rotulo}</span>
     </button>
-  );
-}
-
-function Campo({
-  rotulo,
-  tipo,
-  valor,
-  aoMudar,
-  aoFocar,
-  aoSair,
-  autoCompletar,
-  invalido,
-  dica,
-}: {
-  rotulo: string;
-  tipo: string;
-  valor: string;
-  aoMudar: (valor: string) => void;
-  aoFocar?: () => void;
-  aoSair?: () => void;
-  autoCompletar: string;
-  invalido?: boolean;
-  dica?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-bold">{rotulo}</span>
-      <input
-        type={tipo}
-        value={valor}
-        autoComplete={autoCompletar}
-        aria-invalid={invalido || undefined}
-        onChange={(e) => aoMudar(e.target.value)}
-        onFocus={aoFocar}
-        onBlur={aoSair}
-        className="mt-1 min-h-14 w-full rounded-2xl border-2 px-4 text-base focus-visible:outline-2 focus-visible:outline-offset-2"
-        style={{
-          borderColor: invalido ? 'var(--color-urgencia)' : 'var(--color-linha)',
-          background: 'var(--color-superficie)',
-        }}
-      />
-      {dica && (
-        <span role="alert" className="mt-1 block text-xs font-bold" style={{ color: 'var(--color-urgencia)' }}>
-          {dica}
-        </span>
-      )}
-    </label>
   );
 }

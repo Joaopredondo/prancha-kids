@@ -1,0 +1,9 @@
+{
+  "//": "As funções rodam em Deno, não no Vite. Este arquivo existe para o editor parar de apontar erro em `Deno.env` e nos imports `jsr:` — o tsconfig do app cobre só `src/`.",
+  "imports": {
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window", "dom"]
+  }
+}

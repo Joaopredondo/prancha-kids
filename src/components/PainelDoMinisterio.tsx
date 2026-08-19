@@ -183,6 +183,13 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   const [emailConvite, setEmailConvite] = useState('');
   const [papelConvite, setPapelConvite] = useState<Papel>('voluntario');
   const [convidando, setConvidando] = useState(false);
+  /**
+   * Para quem o e-mail acabou de sair. Sem isto, convidar parecia não fazer
+   * nada: o formulário fecha, a linha entra em "pendentes", e nada diz que
+   * saiu um e-mail — que é justamente a parte que a coordenação precisa saber
+   * para não convidar de novo achando que falhou.
+   */
+  const [enviadoPara, setEnviadoPara] = useState<string | null>(null);
   /** O formulário de convite nasce fechado: é ação ocasional, não o assunto da tela. */
   const [convitAberto, setConviteAberto] = useState(false);
 
@@ -322,12 +329,14 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   const aoConvidar = async () => {
     if (!vinculo || !emailConvite.trim()) return;
     setConvidando(true);
-    const erroDoConvite = await convidar(emailConvite.trim(), vinculo.ministerioId, papelConvite);
+    setErro(null);
+    const erroDoConvite = await convidar(emailConvite.trim(), papelConvite);
     setConvidando(false);
     if (erroDoConvite) {
       setErro(erroDoConvite);
       return;
     }
+    setEnviadoPara(emailConvite.trim());
     setEmailConvite('');
     setConviteAberto(false);
     void carregar();
@@ -444,6 +453,35 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                   }}
                 >
                   {erro}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {enviadoPara && (
+                <motion.p
+                  role="status"
+                  initial={semMovimento ? false : { opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border-2 px-4 py-3 text-sm font-bold"
+                  style={{
+                    borderColor: 'var(--color-acao)',
+                    color: 'var(--color-acao)',
+                    background: 'color-mix(in oklab, var(--color-acao) 8%, transparent)',
+                  }}
+                >
+                  <span>
+                    Convite enviado para <span className="break-all">{enviadoPara}</span> — o código
+                    vale 7 dias.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEnviadoPara(null)}
+                    className="cursor-pointer underline underline-offset-2"
+                  >
+                    ok
+                  </button>
                 </motion.p>
               )}
             </AnimatePresence>

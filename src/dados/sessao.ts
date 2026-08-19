@@ -117,15 +117,118 @@ export async function sair(): Promise<void> {
   await supabase?.auth.signOut();
 }
 
-/** Convida alguém para o ministério. Só coordenador consegue — a RLS confere. */
+/**
+ * Convida alguém e dispara o e-mail com o código.
+ *
+ * Passa pela função `convidar` (em `supabase/functions/convidar/`) em vez de
+ * gravar direto na tabela: o código do convite é gerado pelo banco e o
+ * navegador não pode lê-lo — se pudesse, qualquer membro leria o código de
+ * qualquer convidado, e o segredo deixaria de ser segredo.
+ *
+ * O ministério não vai como parâmetro de propósito. A função descobre pelo
+ * vínculo de quem chamou; mandar daqui seria dar ao cliente a chance de pedir
+ * convite para um ministério que não é o dele.
+ */
 export async function convidar(
   email: string,
-  ministerioId: string,
   papel: Vinculo['papel'] = 'voluntario',
 ): Promise<string | null> {
   if (!supabase) return 'Nuvem não configurada neste aparelho.';
-  const { error } = await supabase
-    .from('convites')
-    .insert({ email: email.trim().toLowerCase(), ministerio_id: ministerioId, papel });
-  return error ? `Não deu para convidar: ${error.message}` : null;
+
+  const { data, error } = await supabase.functions.invoke('convidar', {
+    body: { email: email.trim().toLowerCase(), papel },
+  });
+
+  // `invoke` só devolve `error` para falha de rede ou status fora de 2xx, e
+  // nesse caso o corpo com a mensagem em português fica dentro do contexto.
+  if (error) {
+    const doServidor = (data as { erro?: string } | null)?.erro;
+    if (doServidor) return doServidor;
+
+    const resposta = (error as { context?: Response }).context;
+    if (resposta) {
+      try {
+        const corpo = (await resposta.clone().json()) as { erro?: string };
+        if (corpo.erro) return corpo.erro;
+      } catch {
+        // Resposta sem JSON: cai na mensagem genérica abaixo.
+      }
+    }
+    return 'Não deu para enviar o convite. Tente de novo.';
+  }
+
+  return null;
+}
+
+/**
+ * Confere e-mail e código antes de pedir a senha.
+ *
+ * Serve à mensagem, não à segurança: quem tranca a porta é o trigger
+ * `aplicar_convites()` no banco, que confere o código de novo na hora de
+ * vincular. Sem esta conferência prévia, código errado criaria a conta e a
+ * pessoa cairia numa tela de "sem ministério" sem entender o motivo.
+ */
+export async function conferirConvite(email: string, codigo: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc('conferir_convite', {
+    email_do_convite: email.trim().toLowerCase(),
+    codigo_informado: codigo.trim().toUpperCase(),
+  });
+  return !error && data === true;
+}
+
+/**
+ * Cria a conta de quem foi convidado.
+ *
+ * O código viaja em `options.data`, e é de lá que o trigger no banco o lê para
+ * decidir se vincula ou não. Depois do cadastro, conferimos se o vínculo
+ * nasceu: se não nasceu, o código não bateu, e é melhor dizer isso do que
+ * deixar a pessoa numa conta órfã achando que deu certo.
+ */
+export async function aceitarConvite(
+  email: string,
+  codigo: string,
+  senha: string,
+  nome: string,
+): Promise<string | null> {
+  if (!supabase) return 'Nuvem não configurada neste aparelho.';
+
+  const limpo = email.trim().toLowerCase();
+
+  const { data, error } = await supabase.auth.signUp({
+    email: limpo,
+    password: senha,
+    options: { data: { codigo: codigo.trim().toUpperCase(), nome: nome.trim() } },
+  });
+
+  if (error) {
+    if (error.message.includes('already registered')) {
+      return 'Já existe conta com esse e-mail. Use "Entrar" com a senha que você criou.';
+    }
+    if (error.message.toLowerCase().includes('password')) {
+      return 'Senha muito curta — use pelo menos 6 caracteres.';
+    }
+    return `Não deu para criar a conta: ${error.message}`;
+  }
+
+  // Confirmação de e-mail ligada no projeto: a sessão só existe depois que a
+  // pessoa clica no link. Aí não dá para conferir o vínculo daqui, e o aviso
+  // certo é sobre a caixa de entrada.
+  if (!data.session) {
+    return 'Conta criada. Confirme o e-mail que acabamos de enviar para entrar.';
+  }
+
+  const { data: membro } = await supabase
+    .from('membros')
+    .select('ministerio_id')
+    .eq('usuario_id', data.user?.id ?? '')
+    .limit(1)
+    .maybeSingle();
+
+  if (!membro) {
+    await supabase.auth.signOut();
+    return 'Código incorreto ou convite vencido. Confira o código do e-mail ou peça um novo convite.';
+  }
+
+  return null;
 }

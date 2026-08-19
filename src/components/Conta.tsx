@@ -133,13 +133,14 @@ export function Conta({
           <Botao
             rotulo="Convidar"
             aoTocar={async () => {
-              const erro = await convidar(convite, vinculo.ministerioId);
-              setAviso(erro ?? `Convite guardado para ${convite}.`);
+              const erro = await convidar(convite);
+              setAviso(erro ?? `Convite enviado para ${convite}.`);
               if (!erro) setConvite('');
             }}
           />
           <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
-            A pessoa entra no ministério assim que criar a conta com esse e-mail.
+            A pessoa recebe um e-mail com um código que vale 7 dias. Entra como voluntário — para
+            convidar alguém para a coordenação, use "Gerenciar equipe".
           </p>
         </div>
       )}
