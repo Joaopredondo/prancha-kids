@@ -11,7 +11,7 @@ import { useSincronizacao } from '../hooks/useSincronizacao';
  * fichas entre os voluntários.
  */
 export function Conta({ onEntrar }: { onEntrar: () => void }) {
-  const { carregando, email, vinculo, recarregar } = useConta();
+  const { carregando, email, vinculo, saiuDaEquipe, recarregar } = useConta();
   const { pendentes, ocupado, ultimo, sincronizarAgora, enviarTudo } = useSincronizacao(
     vinculo?.ministerioId ?? null,
   );
@@ -47,6 +47,34 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
           Entrar é opcional e sincroniza as fichas entre os voluntários. Sem conta, o app grava
           só neste aparelho — que é como ele funciona hoje.
         </p>
+      </Bloco>
+    );
+  }
+
+  // Removida da equipe. A RLS já não devolve ficha nem criança deste
+  // ministério, então o resto da tela (sincronizar, convidar) descreveria algo
+  // que não acontece mais. Melhor uma frase honesta do que botões que falham
+  // em silêncio.
+  if (saiuDaEquipe) {
+    return (
+      <Bloco>
+        <p className="text-base font-bold">{email}</p>
+        <p className="mt-1 text-sm font-bold" style={{ color: 'var(--color-urgencia)' }}>
+          Você não está mais na equipe deste ministério.
+        </p>
+        <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+          A sincronização parou: o que for preenchido agora fica só neste aparelho. Fale com
+          a coordenação se isso não era esperado.
+        </p>
+        <div className="mt-3">
+          <Botao
+            rotulo="Sair"
+            aoTocar={async () => {
+              await sair();
+              recarregar();
+            }}
+          />
+        </div>
       </Bloco>
     );
   }

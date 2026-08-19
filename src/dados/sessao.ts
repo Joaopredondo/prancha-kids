@@ -17,26 +17,57 @@ export type EstadoDaConta = {
   carregando: boolean;
   email: string | null;
   vinculo: Vinculo | null;
+  /**
+   * Tem vínculo registrado, mas com `apagado_em` preenchido: a pessoa saiu da
+   * equipe. Diferente de nunca ter tido ministério, e a tela precisa separar os
+   * dois — quem saiu merece saber que saiu, em vez de ver uma sincronização que
+   * não sincroniza mais nada.
+   */
+  saiuDaEquipe: boolean;
 };
 
-async function lerVinculo(): Promise<Vinculo | null> {
-  if (!supabase) return null;
+type Leitura = Pick<EstadoDaConta, 'vinculo' | 'saiuDaEquipe'>;
+
+const SEM_VINCULO: Leitura = { vinculo: null, saiuDaEquipe: false };
+
+/**
+ * O vínculo desta pessoa — e só dela.
+ *
+ * O filtro por `usuario_id` **não** é redundante com a RLS. A partir da
+ * migração 0004 a policy de `membros` deixa cada membro enxergar a equipe
+ * inteira do ministério, que é o que sustenta o painel de administração. Sem o
+ * filtro, este `limit(1)` sem ordem devolveria uma linha qualquer da equipe —
+ * possivelmente a de um coordenador — e a tela passaria a oferecer ações que a
+ * RLS recusaria em silêncio depois. Antes da 0004 o filtro era desnecessário
+ * porque a policy só revelava a própria linha; é uma daquelas consultas que
+ * funcionavam por acidente da permissão, não por estarem certas.
+ */
+async function lerVinculo(usuarioId: string): Promise<Leitura> {
+  if (!supabase) return SEM_VINCULO;
 
   const { data, error } = await supabase
     .from('membros')
-    .select('papel, ministerio_id, ministerios(nome)')
+    .select('papel, ministerio_id, apagado_em, ministerios(nome)')
+    .eq('usuario_id', usuarioId)
+    // Quem participa de mais de um ministério fica com o vínculo ativo à
+    // frente; o encerrado só aparece quando não sobrou nenhum ativo.
+    .order('apagado_em', { nullsFirst: true })
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data) return SEM_VINCULO;
+  if (data.apagado_em) return { vinculo: null, saiuDaEquipe: true };
 
   const ministerios = data.ministerios as unknown as { nome: string } | { nome: string }[] | null;
   const nome = Array.isArray(ministerios) ? ministerios[0]?.nome : ministerios?.nome;
 
   return {
-    ministerioId: data.ministerio_id as string,
-    ministerio: nome ?? 'Ministério',
-    papel: data.papel as Vinculo['papel'],
+    vinculo: {
+      ministerioId: data.ministerio_id as string,
+      ministerio: nome ?? 'Ministério',
+      papel: data.papel as Vinculo['papel'],
+    },
+    saiuDaEquipe: false,
   };
 }
 
@@ -45,6 +76,7 @@ export function useConta(): EstadoDaConta & { recarregar: () => void } {
     carregando: Boolean(supabase),
     email: null,
     vinculo: null,
+    saiuDaEquipe: false,
   });
   const [versao, setVersao] = useState(0);
 
@@ -54,8 +86,10 @@ export function useConta(): EstadoDaConta & { recarregar: () => void } {
     let vivo = true;
     const atualizar = async () => {
       const { data } = await supabase!.auth.getUser();
-      const vinculo = data.user ? await lerVinculo() : null;
-      if (vivo) setEstado({ carregando: false, email: data.user?.email ?? null, vinculo });
+      const leitura = data.user ? await lerVinculo(data.user.id) : SEM_VINCULO;
+      if (vivo) {
+        setEstado({ carregando: false, email: data.user?.email ?? null, ...leitura });
+      }
     };
 
     void atualizar();
