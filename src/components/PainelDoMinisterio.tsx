@@ -29,7 +29,108 @@ const O_QUE_O_PAPEL_FAZ: Record<Papel, string> = {
   coordenador: 'Tudo do voluntário, mais convidar, mudar papel e remover.',
 };
 
+/**
+ * Cor do grupo. Coordenação usa o verde de ação porque é quem age sobre a
+ * equipe; voluntário fica neutro. Vermelho não entra em nenhum dos dois — no
+ * resto do app ele significa "pare", e um grupo de pessoas não é um alerta.
+ */
+const COR_DO_PAPEL: Record<Papel, string> = {
+  coordenador: 'var(--color-acao)',
+  voluntario: 'var(--color-descricao)',
+};
+
+/**
+ * Paleta dos avatares: as cores do Código Fitzgerald que o app já usa nos
+ * cards, menos a de urgência. A escolha é estável por pessoa (deriva do id),
+ * então o mesmo rosto tem sempre a mesma cor entre sessões e aparelhos.
+ */
+const CORES_DE_AVATAR = [
+  'var(--color-acao)',
+  'var(--color-coisa)',
+  'var(--color-descricao)',
+  'var(--color-social)',
+  'var(--color-pessoa)',
+];
+
+function corDoAvatar(chave: string): string {
+  let soma = 0;
+  for (let i = 0; i < chave.length; i += 1) soma = (soma + chave.charCodeAt(i) * (i + 1)) % 9973;
+  return CORES_DE_AVATAR[soma % CORES_DE_AVATAR.length];
+}
+
+/** Iniciais de até duas palavras — "Maria Silva" vira MS, "joao" vira J. */
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '?';
+  if (partes.length === 1) return partes[0].charAt(0).toUpperCase();
+  return (partes[0].charAt(0) + partes[partes.length - 1].charAt(0)).toUpperCase();
+}
+
 const formatarData = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
+
+/**
+ * Ícones desta tela, em SVG — não emoji. É a única tela de adulto do app: o
+ * emoji muda de desenho entre Android, iPhone e desktop (mesmo motivo do
+ * README para não usar emoji nos cards), e aqui não há criança para quem
+ * essa familiaridade importe.
+ */
+function IconeEnvelope({ tamanho = 18 }: { tamanho?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={tamanho}
+      height={tamanho}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+
+function IconeLixeira({ tamanho = 18 }: { tamanho?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={tamanho}
+      height={tamanho}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 7h16" />
+      <path d="M9 7V4h6v3" />
+      <path d="M6 7l1 13h10l1-13" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+function IconeMais({ tamanho = 18 }: { tamanho?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={tamanho}
+      height={tamanho}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
 
 interface Props {
   aoVoltar: () => void;
@@ -42,8 +143,12 @@ interface Props {
  * Entra só pelas Configurações → Conta, nunca pelo `MainNav`: ele fica na
  * frente da criança durante o culto, e esta tela é do voluntário adulto.
  * Errar um toque aqui dá acesso a laudo médico de criança para a pessoa
- * errada — por isso nada de 3D ou enfeite, e remover passa por
- * `BotaoSegurar`, nunca por um clique só.
+ * errada — por isso nada de 3D nem enfeite que dispute a atenção, e remover
+ * passa por `BotaoSegurar`, nunca por um clique só.
+ *
+ * O movimento que existe aqui é todo informativo: a linha viaja entre os
+ * grupos quando o papel muda, o contador rola quando o número muda, e o
+ * pulso verde só acende quando o servidor confirmou. Nada anima por enfeite.
  */
 export function PainelDoMinisterio({ aoVoltar }: Props) {
   const { carregando: carregandoConta, vinculo, saiuDaEquipe } = useConta();
@@ -60,6 +165,8 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   const [emailConvite, setEmailConvite] = useState('');
   const [papelConvite, setPapelConvite] = useState<Papel>('voluntario');
   const [convidando, setConvidando] = useState(false);
+  /** O formulário de convite nasce fechado: é ação ocasional, não o assunto da tela. */
+  const [convitAberto, setConviteAberto] = useState(false);
 
   /**
    * Palco dos dois grupos (Coordenação e Voluntários) e a técnica de
@@ -187,6 +294,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
       return;
     }
     setEmailConvite('');
+    setConviteAberto(false);
     void carregar();
   };
 
@@ -224,7 +332,9 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex flex-col gap-5 px-3 pb-6 sm:px-4">
+      {/* Largura contida: a tela é uma lista de pessoas, e linha longa demais
+          faz o olho perder a associação entre o nome e as ações da direita. */}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-3 pb-10 sm:px-4">
         <button
           type="button"
           onClick={aoVoltar}
@@ -234,7 +344,9 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
           ← Voltar
         </button>
 
-        {carregandoEquipe && <Aviso aoVoltar={undefined}>Carregando equipe…</Aviso>}
+        {/* Só na primeira carga: numa recarga a equipe já está na tela, e
+            trocá-la pelo esqueleto faria o conteúdo piscar sem motivo. */}
+        {carregandoEquipe && !equipe && <Esqueleto />}
 
         {!carregandoEquipe && erro && !equipe && (
           <Aviso aoVoltar={undefined}>
@@ -254,10 +366,24 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
           <>
             <Cabecalho
               ministerio={vinculo.ministerio}
-              equipe={equipe}
-              carregandoEquipe={carregandoEquipe}
+              souCoordenador={Boolean(souCoordenador)}
+              aoAbrirConvite={() => setConviteAberto(true)}
               semMovimento={Boolean(semMovimento)}
             />
+
+            {souCoordenador && (
+              <FormularioDeConvite
+                aberto={convitAberto}
+                aoFechar={() => setConviteAberto(false)}
+                email={emailConvite}
+                aoMudarEmail={setEmailConvite}
+                papel={papelConvite}
+                aoMudarPapel={setPapelConvite}
+                convidando={convidando}
+                aoEnviar={() => void aoConvidar()}
+                semMovimento={Boolean(semMovimento)}
+              />
+            )}
 
             {!souCoordenador && (
               <p
@@ -268,15 +394,28 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
               </p>
             )}
 
-            {erro && (
-              <p className="text-sm font-bold" style={{ color: 'var(--color-urgencia)' }} role="alert">
-                {erro}
-              </p>
-            )}
+            <AnimatePresence>
+              {erro && (
+                <motion.p
+                  role="alert"
+                  initial={semMovimento ? false : { opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-2xl border-2 px-4 py-3 text-sm font-bold"
+                  style={{
+                    borderColor: 'var(--color-urgencia)',
+                    color: 'var(--color-urgencia)',
+                    background: 'color-mix(in oklab, var(--color-urgencia) 8%, transparent)',
+                  }}
+                >
+                  {erro}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
             <div ref={palco} className="flex flex-col gap-5">
               <GrupoDeMembros
-                titulo="Coordenação"
+                papel="coordenador"
                 membros={equipe.membros.filter((m) => m.papel === 'coordenador')}
                 vazio="Nenhum coordenador — não deveria acontecer, avise o suporte."
                 souCoordenador={Boolean(souCoordenador)}
@@ -288,7 +427,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
               />
 
               <GrupoDeMembros
-                titulo="Voluntários"
+                papel="voluntario"
                 membros={equipe.membros.filter((m) => m.papel === 'voluntario')}
                 vazio="Nenhum voluntário ainda."
                 souCoordenador={Boolean(souCoordenador)}
@@ -300,14 +439,23 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
               />
             </div>
 
+            {/* Uma vez para as duas seções, não por pessoa nem repetida em
+                cada uma: a mesma frase duas vezes na tela virava papel de
+                parede, e o toque seguro do botão já avisa que é sério. */}
+            {souCoordenador && equipe.membros.length > 0 && (
+              <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+                Remover tira o acesso às fichas e às crianças. O que a pessoa já registrou
+                continua guardado.
+              </p>
+            )}
+
             {equipe.convites.length > 0 && (
-              <section className="flex flex-col gap-2">
-                <h3
-                  className="text-sm font-bold uppercase tracking-wide"
-                  style={{ color: 'var(--color-texto-suave)' }}
-                >
-                  Convites pendentes ({equipe.convites.length})
-                </h3>
+              <Secao
+                titulo="Convites pendentes"
+                quantidade={equipe.convites.length}
+                cor="var(--color-coisa)"
+                descricao="Cada pessoa entra sozinha assim que criar a conta com o e-mail convidado."
+              >
                 <ul className="flex flex-col gap-2">
                   <AnimatePresence initial={false}>
                     {equipe.convites.map((convite) => (
@@ -318,18 +466,37 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={semMovimento ? undefined : { opacity: 0, transition: { duration: 0.15 } }}
                         className="flex flex-wrap items-center gap-3 rounded-2xl border-2 px-4 py-3"
-                        style={{ borderColor: 'var(--color-linha)' }}
+                        style={{
+                          borderColor: 'var(--color-linha)',
+                          background: 'var(--color-superficie)',
+                        }}
                       >
-                        <span className="min-w-40 flex-1 text-base font-bold">{convite.email}</span>
-                        <span className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-                          {ROTULO_DO_PAPEL[convite.papel]}
+                        <span
+                          aria-hidden="true"
+                          className="grid size-10 shrink-0 place-items-center rounded-full"
+                          style={{
+                            background: 'color-mix(in oklab, var(--color-coisa) 14%, transparent)',
+                            color: 'var(--color-coisa)',
+                          }}
+                        >
+                          <IconeEnvelope />
+                        </span>
+                        <span className="min-w-40 flex-1">
+                          <span className="block text-base font-bold break-all">{convite.email}</span>
+                          <span className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+                            entra como {ROTULO_DO_PAPEL[convite.papel]} · convidado em{' '}
+                            {formatarData(convite.criadoEm)}
+                          </span>
                         </span>
                         {souCoordenador && (
                           <button
                             type="button"
                             onClick={() => void aoCancelarConvite(convite)}
-                            className="min-h-10 cursor-pointer rounded-full border-2 px-3 text-sm font-bold"
-                            style={{ borderColor: 'var(--color-linha)', color: 'var(--color-urgencia)' }}
+                            className="min-h-10 cursor-pointer rounded-full border-2 px-3 text-sm font-bold transition-colors"
+                            style={{
+                              borderColor: 'var(--color-linha)',
+                              color: 'var(--color-urgencia)',
+                            }}
                           >
                             Cancelar
                           </button>
@@ -338,44 +505,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                     ))}
                   </AnimatePresence>
                 </ul>
-              </section>
-            )}
-
-            {souCoordenador && (
-              <section
-                className="flex flex-col gap-2 rounded-3xl border-2 p-4"
-                style={{ borderColor: 'var(--color-linha)' }}
-              >
-                <h3
-                  className="text-sm font-bold uppercase tracking-wide"
-                  style={{ color: 'var(--color-texto-suave)' }}
-                >
-                  Convidar
-                </h3>
-                <label className="block">
-                  <span className="text-sm font-bold">E-mail</span>
-                  <input
-                    type="email"
-                    value={emailConvite}
-                    onChange={(e) => setEmailConvite(e.target.value)}
-                    className="mt-1 min-h-12 w-full rounded-2xl border-2 px-4 text-base"
-                    style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
-                  />
-                </label>
-                <SeletorDePapel idBase="convite" valor={papelConvite} desativado={false} aoMudar={setPapelConvite} />
-                <button
-                  type="button"
-                  disabled={convidando || !emailConvite.trim()}
-                  onClick={() => void aoConvidar()}
-                  className="min-h-12 cursor-pointer self-start rounded-2xl px-4 text-base font-extrabold disabled:opacity-50"
-                  style={{ background: 'var(--color-acao)', color: '#ffffff' }}
-                >
-                  {convidando ? 'Convidando…' : 'Convidar'}
-                </button>
-                <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
-                  A pessoa entra no ministério assim que criar a conta com esse e-mail.
-                </p>
-              </section>
+              </Secao>
             )}
           </>
         )}
@@ -404,87 +534,147 @@ function Aviso({ children, aoVoltar }: { children: React.ReactNode; aoVoltar?: (
   );
 }
 
+/**
+ * Silhueta da tela enquanto a equipe carrega. Repete a forma real (resumo em
+ * cima, duas listas embaixo) para o conteúdo não saltar quando chegar.
+ */
+function Esqueleto() {
+  return (
+    <div aria-hidden="true" className="flex animate-pulse flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <div className="h-7 w-56 rounded-full" style={{ background: 'var(--color-linha)' }} />
+        <div className="grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-20 rounded-2xl border-2"
+              style={{ borderColor: 'var(--color-linha)' }}
+            />
+          ))}
+        </div>
+      </div>
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          className="h-32 rounded-3xl border-2"
+          style={{ borderColor: 'var(--color-linha)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Título, subtítulo e — só para coordenação — o botão que abre o convite.
+ *
+ * Os contadores por seção (o "· N" ao lado de "Coordenação" e "Voluntário")
+ * já dizem quantos tem cada grupo; repetir isso aqui em cards de resumo era
+ * dashboard para uma equipe de poucas pessoas — número que o olho já conta
+ * olhando a lista não precisa de destaque próprio.
+ */
 function Cabecalho({
   ministerio,
-  equipe,
-  carregandoEquipe,
+  souCoordenador,
+  aoAbrirConvite,
   semMovimento,
 }: {
   ministerio: string;
-  equipe: Equipe;
-  carregandoEquipe: boolean;
+  souCoordenador: boolean;
+  aoAbrirConvite: () => void;
   semMovimento: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (semMovimento || carregandoEquipe || !container.current) return;
-    // Só na entrada: depende de `carregandoEquipe` ter virado falso, não do
-    // conteúdo da equipe — mudar papel de alguém não deve reacender isto.
+    if (semMovimento || !container.current) return;
     // `fromTo`, não `from`: em StrictMode o efeito roda duas vezes, e um
     // `from` interrompido deixaria o cabeçalho preso em opacidade zero.
     const animacao = gsap.fromTo(
-      container.current.children,
-      { opacity: 0, y: 8 },
-      { opacity: 1, y: 0, duration: 0.28, stagger: 0.05, ease: 'power2.out' },
+      container.current.querySelectorAll('[data-entra]'),
+      { opacity: 0, y: 10 },
+      { opacity: 1, y: 0, duration: 0.3, stagger: 0.06, ease: 'power2.out' },
     );
     return () => {
       animacao.revert();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semMovimento, carregandoEquipe]);
-
-  const naCoordenacao = equipe.membros.filter((m) => m.papel === 'coordenador').length;
+  }, [semMovimento]);
 
   return (
-    <div ref={container}>
-      <div>
-        <h2 className="text-xl font-extrabold">Equipe · {ministerio}</h2>
+    <div ref={container} className="flex flex-wrap items-start justify-between gap-3">
+      <div data-entra>
+        <h2 className="text-2xl font-extrabold sm:text-3xl">Equipe</h2>
         <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-          Quem está aqui enxerga nome, idade, laudo e foto das crianças do ministério.
+          {ministerio} · quem está aqui enxerga nome, idade, laudo e foto das crianças.
         </p>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Contador valor={equipe.membros.length} rotulo="na equipe" />
-        <Contador valor={naCoordenacao} rotulo="na coordenação" />
-        <Contador valor={equipe.convites.length} rotulo="convites" />
-      </div>
+      {/* A ação principal da tela mora no cabeçalho, não no rodapé: com
+          muitos voluntários, "Convidar" no fim da página só aparecia depois
+          de rolar a lista inteira. */}
+      {souCoordenador && (
+        <button
+          type="button"
+          data-entra
+          onClick={aoAbrirConvite}
+          className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-4 text-sm font-extrabold"
+          style={{ background: 'var(--color-acao)', color: '#ffffff' }}
+        >
+          <IconeMais tamanho={16} />
+          Convidar
+        </button>
+      )}
     </div>
   );
 }
 
-function Contador({ valor, rotulo }: { valor: number; rotulo: string }) {
+/** Caixa de seção: filete de cor no topo, título, contagem e uma linha de contexto. */
+function Secao({
+  titulo,
+  quantidade,
+  cor,
+  descricao,
+  children,
+}: {
+  titulo: string;
+  quantidade: number;
+  cor: string;
+  descricao: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div
-      className="flex min-w-20 flex-col items-center rounded-2xl border-2 px-4 py-2"
-      style={{ borderColor: 'var(--color-linha)' }}
+    <section
+      className="relative flex flex-col gap-3 overflow-hidden rounded-3xl border-2 p-4"
+      style={{ borderColor: 'var(--color-linha)', background: 'var(--color-superficie)' }}
     >
-      <span className="relative grid h-7 place-items-center overflow-hidden text-xl font-extrabold tabular-nums">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={valor}
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -10, opacity: 0 }}
-            transition={{ duration: 0.18 }}
+      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5" style={{ background: cor }} />
+
+      <div className="flex flex-col gap-1 pt-1">
+        <h3 className="flex items-center gap-2 text-base font-extrabold">
+          {titulo}
+          <span
+            className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums"
+            style={{
+              background: `color-mix(in oklab, ${cor} 16%, transparent)`,
+              color: 'var(--color-texto)',
+            }}
           >
-            {valor}
-          </motion.span>
-        </AnimatePresence>
-      </span>
-      <span
-        className="text-xs font-bold uppercase tracking-wide"
-        style={{ color: 'var(--color-texto-suave)' }}
-      >
-        {rotulo}
-      </span>
-    </div>
+            {quantidade}
+          </span>
+        </h3>
+        {/* O que o grupo pode fazer aparece uma vez aqui, não repetido em cada
+            linha: repetido, virava ruído e empurrava as ações para fora da tela. */}
+        <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+          {descricao}
+        </p>
+      </div>
+
+      {children}
+    </section>
   );
 }
 
 function GrupoDeMembros({
-  titulo,
+  papel,
   membros,
   vazio,
   souCoordenador,
@@ -494,7 +684,7 @@ function GrupoDeMembros({
   aoMudarPapel,
   aoRemover,
 }: {
-  titulo: string;
+  papel: Papel;
   membros: Membro[];
   vazio: string;
   souCoordenador: boolean;
@@ -505,16 +695,17 @@ function GrupoDeMembros({
   aoRemover: (membro: Membro) => void;
 }) {
   return (
-    <section className="flex flex-col gap-2">
-      <h3
-        className="text-sm font-bold uppercase tracking-wide"
-        style={{ color: 'var(--color-texto-suave)' }}
-      >
-        {titulo} ({membros.length})
-      </h3>
-
+    <Secao
+      titulo={ROTULO_DO_PAPEL[papel]}
+      quantidade={membros.length}
+      cor={COR_DO_PAPEL[papel]}
+      descricao={O_QUE_O_PAPEL_FAZ[papel]}
+    >
       {membros.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
+        <p
+          className="rounded-2xl border-2 border-dashed px-4 py-6 text-center text-sm"
+          style={{ borderColor: 'var(--color-linha)', color: 'var(--color-texto-suave)' }}
+        >
           {vazio}
         </p>
       ) : (
@@ -527,13 +718,13 @@ function GrupoDeMembros({
               emVoo={emVoo.has(membro.usuarioId)}
               pulsar={confirmada === membro.usuarioId}
               semMovimento={semMovimento}
-              aoMudarPapel={(papel) => aoMudarPapel(membro, papel)}
+              aoMudarPapel={(proximo) => aoMudarPapel(membro, proximo)}
               aoRemover={() => aoRemover(membro)}
             />
           ))}
         </ul>
       )}
-    </section>
+    </Secao>
   );
 }
 
@@ -556,6 +747,7 @@ function LinhaDeMembro({
 }) {
   const pulso = useRef<HTMLSpanElement>(null);
   const podeEditar = souCoordenador && !membro.souEu;
+  const cor = corDoAvatar(membro.usuarioId);
 
   useEffect(() => {
     if (!pulsar || semMovimento || !pulso.current) return;
@@ -565,7 +757,7 @@ function LinhaDeMembro({
     // O pulso só troca a opacidade de um véu por cima — nunca a posição.
     const animacao = gsap.fromTo(
       pulso.current,
-      { opacity: 0.5 },
+      { opacity: 0.45 },
       { opacity: 0, duration: 0.7, ease: 'power2.out' },
     );
     return () => {
@@ -579,8 +771,12 @@ function LinhaDeMembro({
     // Motion por cima do mesmo elemento brigaria pelo `transform`.
     <li
       data-flip-id={membro.usuarioId}
-      className="relative flex flex-wrap items-center gap-3 overflow-hidden rounded-2xl border-2 px-4 py-3 transition-opacity duration-200"
-      style={{ borderColor: 'var(--color-linha)', opacity: emVoo ? 0.5 : 1 }}
+      className="relative overflow-hidden rounded-2xl border-2 transition-opacity duration-200"
+      style={{
+        borderColor: membro.souEu ? cor : 'var(--color-linha)',
+        background: 'var(--color-fundo)',
+        opacity: emVoo ? 0.5 : 1,
+      }}
     >
       {/* O pulso de confirmação: só dispara quando o servidor confirma a
           mudança, não no clique — é o sinal de que a permissão mudou de
@@ -588,57 +784,173 @@ function LinhaDeMembro({
       <span
         ref={pulso}
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-2xl"
+        className="pointer-events-none absolute inset-0"
         style={{ background: 'var(--color-acao)', opacity: 0 }}
       />
 
-      <span
-        aria-hidden="true"
-        className="relative grid size-10 shrink-0 place-items-center rounded-full text-base font-extrabold"
-        style={{ background: 'var(--color-fundo)' }}
-      >
-        {membro.nome.charAt(0).toUpperCase()}
-      </span>
+      <div className="relative flex flex-wrap items-center gap-3 px-3 py-3 sm:flex-nowrap">
+        <span
+          aria-hidden="true"
+          className="grid size-11 shrink-0 place-items-center rounded-full text-sm font-extrabold"
+          style={{
+            background: `color-mix(in oklab, ${cor} 18%, var(--color-superficie))`,
+            color: cor,
+            border: `2px solid color-mix(in oklab, ${cor} 45%, transparent)`,
+          }}
+        >
+          {iniciais(membro.nome)}
+        </span>
 
-      <div className="relative min-w-40 flex-1">
-        <p className="flex flex-wrap items-center gap-2 text-base font-bold">
-          {membro.nome}
-          {membro.souEu && (
-            <span
-              className="rounded-full px-2 py-0.5 text-xs font-bold"
-              style={{ background: 'var(--color-linha)' }}
-            >
-              você
-            </span>
-          )}
-        </p>
-        <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-          {membro.email} · desde {formatarData(membro.desde)}
-        </p>
-      </div>
+        <div className="min-w-40 flex-1">
+          <p className="flex flex-wrap items-center gap-2 text-base font-bold">
+            {membro.nome}
+            {membro.souEu && (
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-bold"
+                style={{
+                  background: `color-mix(in oklab, ${cor} 18%, transparent)`,
+                  color: 'var(--color-texto)',
+                }}
+              >
+                você
+              </span>
+            )}
+          </p>
+          {/* A quebra agressiva vale só para o e-mail, que pode ser longo e
+              sem espaço. Aplicada na linha inteira, ela partia a data ao meio
+              ("desd e 04/02/2026") em tela estreita. */}
+          <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+            <span className="break-all">{membro.email}</span>
+            <span className="whitespace-nowrap"> · desde {formatarData(membro.desde)}</span>
+          </p>
+        </div>
 
-      <div className="relative flex flex-col items-end gap-1">
         <SeletorDePapel
           idBase={membro.usuarioId}
           valor={membro.papel}
           desativado={!podeEditar || emVoo}
           aoMudar={aoMudarPapel}
         />
-        <p className="max-w-40 text-right text-xs" style={{ color: 'var(--color-texto-suave)' }}>
-          {membro.souEu ? 'você não muda o próprio vínculo' : O_QUE_O_PAPEL_FAZ[membro.papel]}
-        </p>
+
+        {/* Remover fica na mesma linha, mas por último e depois de um espaço:
+            já é `BotaoSegurar`, que exige 3 segundos de toque — a proteção
+            contra o engano está no gesto, não em esconder o botão longe. */}
+        {podeEditar && (
+          <BotaoSegurar
+            rotulo="Remover"
+            emoji={<IconeLixeira tamanho={16} />}
+            ativo={false}
+            discreto
+            aoCompletar={aoRemover}
+          />
+        )}
       </div>
 
-      {podeEditar && (
-        <div className="relative flex max-w-40 flex-col items-end gap-1">
-          <BotaoSegurar rotulo="Remover" emoji="🗑️" ativo={false} aoCompletar={aoRemover} />
-          <p className="text-right text-xs" style={{ color: 'var(--color-texto-suave)' }}>
-            Tira o acesso às fichas e às crianças; o que essa pessoa já registrou continua
-            guardado.
-          </p>
+      {membro.souEu && (
+        <div
+          className="relative border-t-2 px-3 py-2 text-xs"
+          style={{ borderColor: 'var(--color-linha)', color: 'var(--color-texto-suave)' }}
+        >
+          Você não muda o próprio vínculo nem se remove — nem o banco deixa.
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Formulário de convite. Quem abre é o botão "Convidar" do cabeçalho — este
+ * componente só cuida do painel em si, e some por completo quando fechado.
+ */
+function FormularioDeConvite({
+  aberto,
+  aoFechar,
+  email,
+  aoMudarEmail,
+  papel,
+  aoMudarPapel,
+  convidando,
+  aoEnviar,
+  semMovimento,
+}: {
+  aberto: boolean;
+  aoFechar: () => void;
+  email: string;
+  aoMudarEmail: (valor: string) => void;
+  papel: Papel;
+  aoMudarPapel: (papel: Papel) => void;
+  convidando: boolean;
+  aoEnviar: () => void;
+  semMovimento: boolean;
+}) {
+  return (
+    <AnimatePresence initial={false}>
+      {aberto && (
+        <motion.section
+          initial={semMovimento ? false : { opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={semMovimento ? undefined : { opacity: 0, height: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ overflow: 'hidden' }}
+        >
+          <div
+            className="relative flex flex-col gap-3 overflow-hidden rounded-3xl border-2 p-4"
+            style={{ borderColor: 'var(--color-acao)', background: 'var(--color-superficie)' }}
+          >
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 h-1.5"
+              style={{ background: 'var(--color-acao)' }}
+            />
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <h3 className="text-base font-extrabold">Convidar alguém</h3>
+              <button
+                type="button"
+                onClick={aoFechar}
+                className="min-h-10 cursor-pointer rounded-full px-3 text-sm font-bold"
+                style={{ color: 'var(--color-texto-suave)' }}
+              >
+                Cancelar
+              </button>
+            </div>
+
+            <label className="block">
+              <span className="text-sm font-bold">E-mail</span>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                value={email}
+                onChange={(e) => aoMudarEmail(e.target.value)}
+                placeholder="pessoa@exemplo.com"
+                className="mt-1 min-h-12 w-full rounded-2xl border-2 px-4 text-base"
+                style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+              />
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-bold">Entra como</span>
+              <SeletorDePapel idBase="convite" valor={papel} desativado={false} aoMudar={aoMudarPapel} />
+            </div>
+
+            <button
+              type="button"
+              disabled={convidando || !email.trim()}
+              onClick={aoEnviar}
+              className="min-h-12 cursor-pointer rounded-2xl px-4 text-base font-extrabold transition-opacity disabled:opacity-50"
+              style={{ background: 'var(--color-acao)', color: '#ffffff' }}
+            >
+              {convidando ? 'Convidando…' : 'Enviar convite'}
+            </button>
+
+            <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+              A pessoa entra no ministério assim que criar a conta com esse e-mail.
+            </p>
+          </div>
+        </motion.section>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -657,8 +969,8 @@ function SeletorDePapel({
     <div
       role="radiogroup"
       aria-label="Papel"
-      className="flex gap-1 rounded-full border-2 p-1"
-      style={{ borderColor: 'var(--color-linha)' }}
+      className="flex shrink-0 gap-1 rounded-full border-2 p-1"
+      style={{ borderColor: 'var(--color-linha)', background: 'var(--color-superficie)' }}
     >
       {(['voluntario', 'coordenador'] as const).map((papel) => {
         const ativo = papel === valor;
