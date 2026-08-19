@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 /** Regra herdada do Lume: a ficha abre só depois de segurar por 3 segundos. */
 export const TEMPO_DE_ESPERA_MS = 3000;
@@ -7,7 +7,14 @@ interface Props {
   rotulo: string;
   ativo: boolean;
   aoCompletar: () => void;
-  emoji?: string;
+  /** Emoji (padrão) ou um ícone SVG — telas de adulto usam SVG, a prancha usa emoji. */
+  emoji?: ReactNode;
+  /**
+   * Sem pílula nem borda — só ícone, rótulo e cor apagada, que ganha
+   * urgência ao segurar. Para ações destrutivas que não podem ter o mesmo
+   * peso visual de uma ação corriqueira ao lado (trocar papel, navegar).
+   */
+  discreto?: boolean;
 }
 
 /**
@@ -17,7 +24,7 @@ interface Props {
  * enquanto mexe no tablet. O progresso é mostrado porque um botão que "não
  * funciona" ao toque simples é indistinguível de um botão quebrado.
  */
-export function BotaoSegurar({ rotulo, ativo, aoCompletar, emoji = '📋' }: Props) {
+export function BotaoSegurar({ rotulo, ativo, aoCompletar, emoji = '📋', discreto = false }: Props) {
   const [progresso, setProgresso] = useState(0);
   const inicio = useRef<number | null>(null);
   const quadro = useRef<number | null>(null);
@@ -67,20 +74,32 @@ export function BotaoSegurar({ rotulo, ativo, aoCompletar, emoji = '📋' }: Pro
         }
       }}
       aria-current={ativo ? 'page' : undefined}
-      className="relative flex shrink-0 snap-start items-center gap-2 overflow-hidden rounded-full border-2 px-4 py-2.5 text-base font-bold"
-      style={{
-        borderColor: ativo ? 'transparent' : 'var(--color-linha)',
-        background: ativo ? 'var(--color-texto)' : 'var(--color-superficie)',
-        color: ativo ? 'var(--color-fundo)' : 'var(--color-texto-suave)',
-      }}
+      className={
+        discreto
+          ? 'relative flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full px-3 py-2 text-sm font-bold'
+          : 'relative flex shrink-0 snap-start items-center gap-2 overflow-hidden rounded-full border-2 px-4 py-2.5 text-base font-bold'
+      }
+      style={
+        discreto
+          ? { color: progresso > 0 ? 'var(--color-urgencia)' : 'var(--color-texto-suave)' }
+          : {
+              borderColor: ativo ? 'transparent' : 'var(--color-linha)',
+              background: ativo ? 'var(--color-texto)' : 'var(--color-superficie)',
+              color: ativo ? 'var(--color-fundo)' : 'var(--color-texto-suave)',
+            }
+      }
     >
       <span
         aria-hidden="true"
         className="absolute inset-y-0 left-0"
-        style={{ width: `${progresso * 100}%`, background: 'var(--color-acao)', opacity: 0.35 }}
+        style={{
+          width: `${progresso * 100}%`,
+          background: discreto ? 'var(--color-urgencia)' : 'var(--color-acao)',
+          opacity: discreto ? 0.16 : 0.35,
+        }}
       />
       <span className="relative flex items-center gap-2">
-        <span aria-hidden="true" className="text-lg">
+        <span aria-hidden="true" className={discreto ? undefined : 'text-lg'}>
           {emoji}
         </span>
         {rotulo}
