@@ -1,5 +1,6 @@
 import { baixarFotoSeFaltar, baixarVozesQueFaltam, enviarFoto, enviarVoz } from './arquivosNuvem';
 import { esquecerVoz } from '../audio/player';
+import { eventoPorId, removerEventosEnviados } from './eventos';
 import type { Ficha, Marcacao } from './ficha';
 import { fichaPorId, guardarFichaDaNuvem, listarFichasComApagadas } from './fichas';
 import { baixarDaFila, listarPendencias, registrarSync, ROTINA_GERAL, ultimoSync } from './fila';
@@ -110,6 +111,33 @@ async function enviar(ministerioId: string): Promise<number> {
       ];
     });
 
+  const pendenciasDeEventos = pendencias.filter((p) => p.tabela === 'eventos');
+  let eventos: { id: string; ministerio_id: string; usuario_id: string; tipo: string; crianca_id: string | null; detalhe: string; criado_em: string }[] = [];
+  if (pendenciasDeEventos.length > 0) {
+    const { data } = await supabase.auth.getUser();
+    const usuarioId = data.user?.id;
+    // Sem usuário logado não há de quem seria o evento — a fila fica para a
+    // próxima sincronização, quando alguém estiver de fato autenticado.
+    if (usuarioId) {
+      eventos = pendenciasDeEventos.flatMap((p) => {
+        const evento = eventoPorId(p.id);
+        if (!evento) return [];
+        enviados.push(p);
+        return [
+          {
+            id: evento.id,
+            ministerio_id: ministerioId,
+            usuario_id: usuarioId,
+            tipo: evento.tipo,
+            crianca_id: evento.criancaId,
+            detalhe: evento.detalhe,
+            criado_em: paraIso(evento.criadoEm),
+          },
+        ];
+      });
+    }
+  }
+
   // Crianças primeiro: a ficha aponta para elas.
   if (criancas.length > 0) {
     const { error } = await supabase.from('criancas').upsert(criancas);
@@ -125,6 +153,13 @@ async function enviar(ministerioId: string): Promise<number> {
       .upsert(rotinas, { onConflict: 'ministerio_id,crianca_id' });
     if (error) throw new Error(error.message);
   }
+  if (eventos.length > 0) {
+    const { error } = await supabase.from('eventos').upsert(eventos);
+    if (error) throw new Error(error.message);
+    // Log confirmado no servidor: some do aparelho, diferente de fichas/perfis
+    // que continuam locais para a tela reler depois.
+    removerEventosEnviados(eventos.map((e) => e.id));
+  }
 
   // Binários vão depois das linhas: se o envio do arquivo falhar, o cadastro
   // já está lá e a foto sobe na próxima tentativa.
@@ -137,7 +172,7 @@ async function enviar(ministerioId: string): Promise<number> {
   }
 
   baixarDaFila(enviados);
-  return criancas.length + fichas.length + rotinas.length;
+  return criancas.length + fichas.length + rotinas.length + eventos.length;
 }
 
 async function receber(ministerioId: string): Promise<number> {

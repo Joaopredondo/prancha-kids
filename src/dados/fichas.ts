@@ -1,3 +1,4 @@
+import { registrarEvento } from './eventos';
 import { enfileirar } from './fila';
 import type { Ficha } from './ficha';
 
@@ -97,6 +98,7 @@ export function salvarFicha(ficha: Ficha): Ficha {
   fichas[ficha.id] = salva;
   gravar(fichas);
   enfileirar('fichas', ficha.id);
+  registrarEvento('ficha', ficha.perfilId, `Ficha de ${ficha.nome || 'criança sem nome'}`);
   return salva;
 }
 
