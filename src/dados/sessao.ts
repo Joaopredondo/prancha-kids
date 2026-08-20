@@ -125,15 +125,20 @@ export async function sair(): Promise<void> {
  * nativamente — reinventar isso manualmente seria refazer pior uma proteção
  * contra força bruta que já existe pronta.
  *
- * Sempre volta `null` mesmo se o e-mail não existir — é o Supabase evitando
- * que alguém descubra quais e-mails têm conta só tentando recuperar senha.
+ * Passa pela função `recuperar-senha` (em `supabase/functions/recuperar-senha/`)
+ * em vez de `auth.resetPasswordForEmail` direto: o link ainda é gerado e
+ * verificado pelo Auth, só o envio passa a ser nosso — mesma Brevo e mesmo
+ * template do convite, em vez do mailer genérico do Supabase.
+ *
+ * Sempre volta `null` mesmo se o e-mail não existir — é a função evitando que
+ * alguém descubra quais e-mails têm conta só tentando recuperar senha.
  */
 export async function pedirRecuperacaoDeSenha(email: string): Promise<string | null> {
   if (!supabase) return 'Nuvem não configurada neste aparelho.';
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo: window.location.origin,
+  const { error } = await supabase.functions.invoke('recuperar-senha', {
+    body: { email: email.trim().toLowerCase() },
   });
-  return error ? `Não deu para enviar: ${error.message}` : null;
+  return error ? 'Não deu para enviar. Tente de novo.' : null;
 }
 
 /**
