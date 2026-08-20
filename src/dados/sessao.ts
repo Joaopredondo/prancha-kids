@@ -178,6 +178,19 @@ export async function conferirConvite(email: string, codigo: string): Promise<bo
 }
 
 /**
+ * Resultado de `aceitarConvite`.
+ *
+ * Não é `string | null` como o resto do arquivo porque um dos desfechos aqui
+ * **não é erro**: "conta criada, confirme o e-mail" é a coisa certa
+ * acontecendo, só que a pessoa ainda tem um passo a mais. Misturar isso com
+ * `erro` fazia a tela mostrar essa frase em vermelho e tremendo, como se
+ * tivesse dado errado — confundia mais do que ajudava.
+ */
+export type ResultadoDoAceite =
+  | { sucesso: true }
+  | { sucesso: false; mensagem: string; ehErro: boolean };
+
+/**
  * Cria a conta de quem foi convidado.
  *
  * O código viaja em `options.data`, e é de lá que o trigger no banco o lê para
@@ -190,8 +203,10 @@ export async function aceitarConvite(
   codigo: string,
   senha: string,
   nome: string,
-): Promise<string | null> {
-  if (!supabase) return 'Nuvem não configurada neste aparelho.';
+): Promise<ResultadoDoAceite> {
+  if (!supabase) {
+    return { sucesso: false, mensagem: 'Nuvem não configurada neste aparelho.', ehErro: true };
+  }
 
   const limpo = email.trim().toLowerCase();
 
@@ -203,19 +218,31 @@ export async function aceitarConvite(
 
   if (error) {
     if (error.message.includes('already registered')) {
-      return 'Já existe conta com esse e-mail. Use "Entrar" com a senha que você criou.';
+      return {
+        sucesso: false,
+        mensagem: 'Já existe conta com esse e-mail. Use "Entrar" com a senha que você criou.',
+        ehErro: true,
+      };
     }
     if (error.message.toLowerCase().includes('password')) {
-      return 'Senha muito curta — use pelo menos 6 caracteres.';
+      return {
+        sucesso: false,
+        mensagem: 'Senha muito curta — use pelo menos 6 caracteres.',
+        ehErro: true,
+      };
     }
-    return `Não deu para criar a conta: ${error.message}`;
+    return { sucesso: false, mensagem: `Não deu para criar a conta: ${error.message}`, ehErro: true };
   }
 
   // Confirmação de e-mail ligada no projeto: a sessão só existe depois que a
   // pessoa clica no link. Aí não dá para conferir o vínculo daqui, e o aviso
-  // certo é sobre a caixa de entrada.
+  // certo é sobre a caixa de entrada — não um erro.
   if (!data.session) {
-    return 'Conta criada. Confirme o e-mail que acabamos de enviar para entrar.';
+    return {
+      sucesso: false,
+      mensagem: 'Conta criada. Confirme o e-mail que acabamos de enviar para entrar.',
+      ehErro: false,
+    };
   }
 
   const { data: membro } = await supabase
@@ -227,8 +254,12 @@ export async function aceitarConvite(
 
   if (!membro) {
     await supabase.auth.signOut();
-    return 'Código incorreto ou convite vencido. Confira o código do e-mail ou peça um novo convite.';
+    return {
+      sucesso: false,
+      mensagem: 'Código incorreto ou convite vencido. Confira o código do e-mail ou peça um novo convite.',
+      ehErro: true,
+    };
   }
 
-  return null;
+  return { sucesso: true };
 }
