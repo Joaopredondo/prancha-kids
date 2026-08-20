@@ -39,6 +39,7 @@ const GravarVozes = lazy(() =>
 const PainelDoMinisterio = lazy(() =>
   import('./components/PainelDoMinisterio').then((m) => ({ default: m.PainelDoMinisterio })),
 );
+const Resumo = lazy(() => import('./components/Resumo').then((m) => ({ default: m.Resumo })));
 
 export default function App() {
   const { prefs, definir } = usePrefs();
@@ -113,7 +114,11 @@ export default function App() {
   };
 
   const areaProtegida =
-    vista === 'ficha' || vista === 'frequencia' || vista === 'vozes' || vista === 'ministerio';
+    vista === 'ficha' ||
+    vista === 'frequencia' ||
+    vista === 'vozes' ||
+    vista === 'ministerio' ||
+    vista === 'resumo';
 
   /**
    * Tela cheia, sem cabeçalho nem menu: é uma barreira, e barreira com o menu
@@ -217,6 +222,12 @@ export default function App() {
                 {vista === 'frequencia' && <Frequencia />}
                 {vista === 'vozes' && <GravarVozes />}
                 {vista === 'ministerio' && <PainelDoMinisterio aoVoltar={() => setVista('prancha')} />}
+                {vista === 'resumo' && (
+                  <Resumo
+                    aoVoltar={() => setVista('prancha')}
+                    aoAbrirEquipe={() => setVista('ministerio')}
+                  />
+                )}
               </Suspense>
             </motion.div>
           </AnimatePresence>
@@ -237,6 +248,7 @@ export default function App() {
         vista={vista}
         aoFechar={() => setMenuAberto(false)}
         onFrequencia={() => setVista('frequencia')}
+        onResumo={() => setVista('resumo')}
         onEquipe={() => setVista('ministerio')}
         onGravarVozes={() => setVista('vozes')}
         onEntrar={() => {
