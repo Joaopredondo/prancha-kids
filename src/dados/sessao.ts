@@ -118,6 +118,57 @@ export async function sair(): Promise<void> {
 }
 
 /**
+ * Manda o link de recuperação de senha.
+ *
+ * Link, não código: quem adivinha um código de 6 dígitos assume a conta
+ * inteira, e um link com token longo é o que o Supabase Auth já resolve
+ * nativamente — reinventar isso manualmente seria refazer pior uma proteção
+ * contra força bruta que já existe pronta.
+ *
+ * Sempre volta `null` mesmo se o e-mail não existir — é o Supabase evitando
+ * que alguém descubra quais e-mails têm conta só tentando recuperar senha.
+ */
+export async function pedirRecuperacaoDeSenha(email: string): Promise<string | null> {
+  if (!supabase) return 'Nuvem não configurada neste aparelho.';
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo: window.location.origin,
+  });
+  return error ? `Não deu para enviar: ${error.message}` : null;
+}
+
+/**
+ * Troca a senha depois que a pessoa voltou do link do e-mail.
+ *
+ * Só funciona dentro da sessão de recuperação que `aoRecuperarSenha` avisa
+ * ter começado — sem essa sessão o Supabase recusa a troca sozinho.
+ */
+export async function redefinirSenha(senha: string): Promise<string | null> {
+  if (!supabase) return 'Nuvem não configurada neste aparelho.';
+  const { error } = await supabase.auth.updateUser({ password: senha });
+  if (!error) return null;
+  if (error.message.toLowerCase().includes('password')) {
+    return 'Senha muito curta — use pelo menos 6 caracteres.';
+  }
+  return `Não deu para trocar a senha: ${error.message}`;
+}
+
+/**
+ * Avisa quando a pessoa volta do link do e-mail de recuperação.
+ *
+ * O Supabase lê o token da URL sozinho (`detectSessionInUrl`) e dispara
+ * `PASSWORD_RECOVERY` — este evento é o único jeito de saber que a sessão
+ * atual é uma sessão de recuperação, não um login normal, e que por isso a
+ * tela deve pedir a senha nova em vez de abrir a área do voluntário direto.
+ */
+export function aoRecuperarSenha(aoAcontecer: () => void): () => void {
+  if (!supabase) return () => {};
+  const { data } = supabase.auth.onAuthStateChange((evento) => {
+    if (evento === 'PASSWORD_RECOVERY') aoAcontecer();
+  });
+  return () => data.subscription.unsubscribe();
+}
+
+/**
  * Convida alguém e dispara o e-mail com o código.
  *
  * Passa pela função `convidar` (em `supabase/functions/convidar/`) em vez de
