@@ -32,8 +32,11 @@ import {
   type Filtro,
 } from '../dados/fichas';
 import { apagarArquivo, chaveDaFoto } from '../dados/arquivos';
+import { gerarCartao } from '../dados/cartao';
 import { apagarPerfil, listarPerfis, perfilPorId, salvarPerfil, type Perfil } from '../dados/perfis';
+import { lerRotina } from '../dados/rotinas';
 import { Celebracao } from './Celebracao';
+import { CartaoDoCulto } from './CartaoDoCulto';
 import { SeletorDeCrianca } from './SeletorDeCrianca';
 
 /**
@@ -56,6 +59,7 @@ export function Ficha() {
   const [anteriores, setAnteriores] = useState<TipoDaFicha[]>([]);
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [filtro, setFiltro] = useState<Filtro>({ perfilId: null, dia: null, horario: null });
+  const [cartao, setCartao] = useState<{ nome: string; texto: string } | null>(null);
 
   useEffect(() => {
     setAnteriores(listarFichas());
@@ -132,6 +136,17 @@ export function Ficha() {
     if (ficha.id === id) novaFicha();
   };
 
+  /**
+   * Monta o texto na hora de abrir, não a cada tecla: o cartão é um retrato
+   * de "como está agora", não precisa recalcular a cada campo digitado.
+   */
+  const abrirCartao = () => {
+    const perfil = perfilPorId(ficha.perfilId);
+    if (!perfil) return;
+    const rotina = lerRotina(perfil.id);
+    setCartao({ nome: perfil.nome, texto: gerarCartao(perfil, ficha, rotina) });
+  };
+
   return (
     <div className="flex flex-col gap-5 px-3 pb-6 sm:px-4">
       <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
@@ -167,6 +182,17 @@ export function Ficha() {
           if (ficha.perfilId === perfil.id) novaFicha(null);
         }}
       />
+
+      {ficha.perfilId && (
+        <button
+          type="button"
+          onClick={abrirCartao}
+          className="min-h-11 cursor-pointer self-start rounded-full border-2 px-4 text-sm font-bold"
+          style={{ borderColor: 'var(--color-linha)', background: 'var(--color-superficie)' }}
+        >
+          📤 Cartão do culto para os pais
+        </button>
+      )}
 
       {historico.length > 0 && <Briefing fichas={historico} aoAbrir={abrir} />}
 
@@ -572,6 +598,13 @@ export function Ficha() {
       )}
 
       <Celebracao aberto={comemorando} aoFechar={() => setComemorando(false)} />
+
+      <CartaoDoCulto
+        aberto={cartao !== null}
+        nomeDaCrianca={cartao?.nome ?? ''}
+        texto={cartao?.texto ?? ''}
+        onFechar={() => setCartao(null)}
+      />
     </div>
   );
 }
