@@ -4,7 +4,15 @@ import { CATEGORIAS } from '../data/cards';
 import type { Categoria } from '../types';
 
 export type Aba = Categoria | 'tudo';
-export type Vista = 'prancha' | 'agora' | 'ficha' | 'frequencia' | 'vozes' | 'login' | 'ministerio';
+export type Vista =
+  | 'prancha'
+  | 'agora'
+  | 'ficha'
+  | 'frequencia'
+  | 'vozes'
+  | 'login'
+  | 'ministerio'
+  | 'resumo';
 
 interface Props {
   vista: Vista;

@@ -19,6 +19,7 @@ interface Props {
   aoFechar: () => void;
   onFicha: () => void;
   onFrequencia: () => void;
+  onResumo: () => void;
   onEquipe: () => void;
   onGravarVozes: () => void;
   onEntrar: () => void;
@@ -44,6 +45,7 @@ export function MenuLateral({
   aoFechar,
   onFicha,
   onFrequencia,
+  onResumo,
   onEquipe,
   onGravarVozes,
   onEntrar,
@@ -125,6 +127,12 @@ export function MenuLateral({
               </GrupoDoMenu>
 
               <GrupoDoMenu titulo="Ministério">
+                <ItemDoMenu
+                  emoji="🧭"
+                  rotulo="Resumo"
+                  ativo={vista === 'resumo'}
+                  aoTocar={irPara(onResumo)}
+                />
                 <ItemDoMenu
                   emoji="👥"
                   rotulo="Equipe"
