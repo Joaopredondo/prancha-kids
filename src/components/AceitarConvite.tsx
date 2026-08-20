@@ -46,10 +46,13 @@ export function AceitarConvite({
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  /** Diferente de `erro`: nada deu errado, só falta um passo (confirmar o e-mail). */
+  const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
   const recusar = (mensagem: string) => {
     setErro(mensagem);
+    setAviso(null);
     aoErrar();
   };
 
@@ -82,11 +85,17 @@ export function AceitarConvite({
     }
 
     setOcupado(true);
-    const falha = await aceitarConvite(email, codigo, senha, nome);
+    setAviso(null);
+    const resultado = await aceitarConvite(email, codigo, senha, nome);
     setOcupado(false);
 
-    if (falha) {
-      recusar(falha);
+    if (!resultado.sucesso) {
+      if (resultado.ehErro) {
+        recusar(resultado.mensagem);
+      } else {
+        setErro(null);
+        setAviso(resultado.mensagem);
+      }
       return;
     }
     aoEntrar();
@@ -229,6 +238,7 @@ export function AceitarConvite({
               onClick={() => {
                 setEtapa('codigo');
                 setErro(null);
+                setAviso(null);
               }}
               className="cursor-pointer text-sm font-bold underline underline-offset-2"
               style={{ color: 'var(--color-texto-suave)' }}
@@ -242,6 +252,12 @@ export function AceitarConvite({
       {erro && (
         <p role="alert" className="text-sm font-bold" style={{ color: 'var(--color-urgencia)' }}>
           {erro}
+        </p>
+      )}
+
+      {aviso && (
+        <p role="status" className="text-sm font-bold" style={{ color: 'var(--color-acao)' }}>
+          {aviso}
         </p>
       )}
 
