@@ -184,6 +184,7 @@ export default function App() {
           setVista('prancha');
         }}
         onAgora={() => setVista('agora')}
+        onFicha={() => setVista('ficha')}
       />
 
       <main className="flex-1">
@@ -235,7 +236,6 @@ export default function App() {
         aberto={menuAberto}
         vista={vista}
         aoFechar={() => setMenuAberto(false)}
-        onFicha={() => setVista('ficha')}
         onFrequencia={() => setVista('frequencia')}
         onEquipe={() => setVista('ministerio')}
         onGravarVozes={() => setVista('vozes')}
