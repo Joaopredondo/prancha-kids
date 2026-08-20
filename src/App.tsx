@@ -4,6 +4,7 @@ import logo from './assets/ipi.png';
 import { Board } from './components/Board';
 import { Footer } from './components/Footer';
 import { MainNav, type Vista } from './components/MainNav';
+import { MenuLateral } from './components/MenuLateral';
 import { PortaoDoVoluntario } from './components/PortaoDoVoluntario';
 import { SettingsSheet } from './components/SettingsSheet';
 import { CARDS } from './data/cards';
@@ -46,6 +47,7 @@ export default function App() {
   const [cardFalando, setCardFalando] = useState<string | null>(null);
   const semMovimento = useReducedMotion();
   const [configAberta, setConfigAberta] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
   // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
   // Exceto vindo de um link de convite: aí precisa cair direto no portão, ou
   // o `?convite=` no endereço nunca seria lido por ninguém — a prancha
@@ -135,8 +137,25 @@ export default function App() {
       data-tamanho={prefs.tamanho}
       className="mx-auto flex min-h-full max-w-6xl flex-col"
     >
-      <header className="flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
-        <h1 className="flex items-center gap-2 text-xl font-extrabold sm:text-2xl">
+      <header className="flex items-center gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (!liberado) {
+              setDepoisDeEntrar(vista);
+              setVista('login');
+              return;
+            }
+            setMenuAberto(true);
+          }}
+          aria-label="Abrir menu do voluntário"
+          className="rounded-full border-2 px-3 py-2 text-lg"
+          style={{ borderColor: 'var(--color-linha)', background: 'var(--color-superficie)' }}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+
+        <h1 className="flex flex-1 items-center gap-2 text-xl font-extrabold sm:text-2xl">
           <img
             src={logo}
             alt=""
@@ -145,6 +164,7 @@ export default function App() {
           />
           Prancha Kids
         </h1>
+
         <button
           type="button"
           onClick={() => setConfigAberta(true)}
@@ -164,8 +184,6 @@ export default function App() {
           setVista('prancha');
         }}
         onAgora={() => setVista('agora')}
-        onFicha={() => setVista('ficha')}
-        onFrequencia={() => setVista('frequencia')}
       />
 
       <main className="flex-1">
@@ -211,12 +229,20 @@ export default function App() {
         prefs={prefs}
         onDefinir={definir}
         onFechar={() => setConfigAberta(false)}
+      />
+
+      <MenuLateral
+        aberto={menuAberto}
+        vista={vista}
+        aoFechar={() => setMenuAberto(false)}
+        onFicha={() => setVista('ficha')}
+        onFrequencia={() => setVista('frequencia')}
+        onEquipe={() => setVista('ministerio')}
         onGravarVozes={() => setVista('vozes')}
         onEntrar={() => {
           setDepoisDeEntrar(vista);
           setVista('login');
         }}
-        onEquipe={() => setVista('ministerio')}
       />
     </div>
   );

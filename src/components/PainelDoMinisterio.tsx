@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import { BotaoSegurar } from './BotaoSegurar';
 import { listarAtividade, listarUltimoAcesso, type EventoDaEquipe } from '../dados/atividade';
+import { corDoAvatar, iniciais } from '../dados/avatar';
 import {
   cancelarConvite,
   listarEquipe,
@@ -40,32 +41,6 @@ const COR_DO_PAPEL: Record<Papel, string> = {
   voluntario: 'var(--color-descricao)',
 };
 
-/**
- * Paleta dos avatares: as cores do Código Fitzgerald que o app já usa nos
- * cards, menos a de urgência. A escolha é estável por pessoa (deriva do id),
- * então o mesmo rosto tem sempre a mesma cor entre sessões e aparelhos.
- */
-const CORES_DE_AVATAR = [
-  'var(--color-acao)',
-  'var(--color-coisa)',
-  'var(--color-descricao)',
-  'var(--color-social)',
-  'var(--color-pessoa)',
-];
-
-function corDoAvatar(chave: string): string {
-  let soma = 0;
-  for (let i = 0; i < chave.length; i += 1) soma = (soma + chave.charCodeAt(i) * (i + 1)) % 9973;
-  return CORES_DE_AVATAR[soma % CORES_DE_AVATAR.length];
-}
-
-/** Iniciais de até duas palavras — "Maria Silva" vira MS, "joao" vira J. */
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return '?';
-  if (partes.length === 1) return partes[0].charAt(0).toUpperCase();
-  return (partes[0].charAt(0) + partes[partes.length - 1].charAt(0)).toUpperCase();
-}
 
 const formatarData = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
