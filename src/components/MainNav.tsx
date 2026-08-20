@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { CATEGORIAS } from '../data/cards';
 import type { Categoria } from '../types';
+import { BotaoSegurar } from './BotaoSegurar';
 
 export type Aba = Categoria | 'tudo';
 export type Vista = 'prancha' | 'agora' | 'ficha' | 'frequencia' | 'vozes' | 'login' | 'ministerio';
@@ -11,6 +12,7 @@ interface Props {
   aba: Aba;
   onAba: (aba: Aba) => void;
   onAgora: () => void;
+  onFicha: () => void;
 }
 
 const ABAS: { id: Aba; label: string; emoji: string }[] = [
@@ -23,7 +25,7 @@ const ABAS: { id: Aba; label: string; emoji: string }[] = [
  * ao lado, como irmã, e não dentro da prancha — são dois usos diferentes, um da
  * criança e outro do voluntário.
  */
-export function MainNav({ vista, aba, onAba, onAgora }: Props) {
+export function MainNav({ vista, aba, onAba, onAgora, onFicha }: Props) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
 
@@ -147,6 +149,8 @@ export function MainNav({ vista, aba, onAba, onAgora }: Props) {
         </span>
         Agora e depois
       </button>
+
+      <BotaoSegurar rotulo="Ficha do culto" ativo={vista === 'ficha'} aoCompletar={onFicha} />
     </nav>
   );
 }

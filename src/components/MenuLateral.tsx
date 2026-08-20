@@ -17,7 +17,6 @@ interface Props {
   aberto: boolean;
   vista: Vista;
   aoFechar: () => void;
-  onFicha: () => void;
   onFrequencia: () => void;
   onEquipe: () => void;
   onGravarVozes: () => void;
@@ -42,7 +41,6 @@ export function MenuLateral({
   aberto,
   vista,
   aoFechar,
-  onFicha,
   onFrequencia,
   onEquipe,
   onGravarVozes,
@@ -110,12 +108,6 @@ export function MenuLateral({
               <Conta onEntrar={irPara(onEntrar)} />
 
               <GrupoDoMenu titulo="No culto">
-                <ItemDoMenu
-                  emoji="📋"
-                  rotulo="Ficha do culto"
-                  ativo={vista === 'ficha'}
-                  aoTocar={irPara(onFicha)}
-                />
                 <ItemDoMenu
                   emoji="📊"
                   rotulo="Frequência"
