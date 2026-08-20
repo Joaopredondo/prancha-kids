@@ -2,9 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
+import { Avatar } from './Avatar';
 import { BotaoSegurar } from './BotaoSegurar';
 import { listarAtividade, listarUltimoAcesso, type EventoDaEquipe } from '../dados/atividade';
-import { corDoAvatar, iniciais } from '../dados/avatar';
+import { corDoAvatar } from '../dados/avatar';
+import { chaveDaFoto } from '../dados/arquivos';
+import { baixarFotoDoMembroSeFaltar } from '../dados/arquivosNuvem';
 import {
   cancelarConvite,
   listarEquipe,
@@ -154,6 +157,8 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   /** Só a coordenação carrega isto — a RLS recusaria pro voluntário mesmo assim. */
   const [atividade, setAtividade] = useState<EventoDaEquipe[] | null>(null);
   const [ultimoAcesso, setUltimoAcesso] = useState<Map<string, string | null> | null>(null);
+  /** Sobe a cada leva de fotos de colega baixada, pro Avatar reler o IndexedDB. */
+  const [fotosVersao, setFotosVersao] = useState(0);
 
   const [emailConvite, setEmailConvite] = useState('');
   const [papelConvite, setPapelConvite] = useState<Papel>('voluntario');
@@ -220,6 +225,30 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  /**
+   * Traz a foto de quem tem uma e este aparelho ainda não baixou — a leitura
+   * já é local depois disso, `Avatar` só chama `useArquivo` no IndexedDB. Sem
+   * este efeito, um colega com foto nova só apareceria com ela no próprio
+   * aparelho dele.
+   */
+  useEffect(() => {
+    if (!vinculo || !equipe) return;
+    let vivo = true;
+    void (async () => {
+      let alguma = false;
+      for (const membro of equipe.membros) {
+        if (!membro.fotoAtualizadaEm) continue;
+        if (await baixarFotoDoMembroSeFaltar(vinculo.ministerioId, membro.usuarioId)) {
+          alguma = true;
+        }
+      }
+      if (vivo && alguma) setFotosVersao((v) => v + 1);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [vinculo, equipe]);
 
   useEffect(() => {
     if (!vinculo || vinculo.papel !== 'coordenador') return;
@@ -471,6 +500,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                 confirmada={confirmada}
                 semMovimento={Boolean(semMovimento)}
                 ultimoAcesso={ultimoAcesso}
+                fotosVersao={fotosVersao}
                 aoMudarPapel={aoMudarPapel}
                 aoRemover={aoRemover}
               />
@@ -484,6 +514,7 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
                 confirmada={confirmada}
                 semMovimento={Boolean(semMovimento)}
                 ultimoAcesso={ultimoAcesso}
+                fotosVersao={fotosVersao}
                 aoMudarPapel={aoMudarPapel}
                 aoRemover={aoRemover}
               />
@@ -561,7 +592,8 @@ export function PainelDoMinisterio({ aoVoltar }: Props) {
             {souCoordenador && (
               <AtividadeRecente
                 eventos={atividade}
-                nomePorUsuario={new Map(equipe.membros.map((m) => [m.usuarioId, m.nome]))}
+                membroPorUsuario={new Map(equipe.membros.map((m) => [m.usuarioId, m]))}
+                fotosVersao={fotosVersao}
               />
             )}
           </>
@@ -739,6 +771,7 @@ function GrupoDeMembros({
   confirmada,
   semMovimento,
   ultimoAcesso,
+  fotosVersao,
   aoMudarPapel,
   aoRemover,
 }: {
@@ -750,6 +783,7 @@ function GrupoDeMembros({
   confirmada: string | null;
   semMovimento: boolean;
   ultimoAcesso: Map<string, string | null> | null;
+  fotosVersao: number;
   aoMudarPapel: (membro: Membro, papel: Papel) => void;
   aoRemover: (membro: Membro) => void;
 }) {
@@ -778,6 +812,7 @@ function GrupoDeMembros({
               pulsar={confirmada === membro.usuarioId}
               semMovimento={semMovimento}
               ultimoAcesso={ultimoAcesso ? (ultimoAcesso.get(membro.usuarioId) ?? null) : undefined}
+              fotosVersao={fotosVersao}
               aoMudarPapel={(proximo) => aoMudarPapel(membro, proximo)}
               aoRemover={() => aoRemover(membro)}
             />
@@ -795,6 +830,7 @@ function LinhaDeMembro({
   pulsar,
   semMovimento,
   ultimoAcesso,
+  fotosVersao,
   aoMudarPapel,
   aoRemover,
 }: {
@@ -805,6 +841,7 @@ function LinhaDeMembro({
   semMovimento: boolean;
   /** `undefined` = ainda não carregou; `null` = carregou e a pessoa nunca entrou. */
   ultimoAcesso?: string | null;
+  fotosVersao: number;
   aoMudarPapel: (papel: Papel) => void;
   aoRemover: () => void;
 }) {
@@ -852,17 +889,12 @@ function LinhaDeMembro({
       />
 
       <div className="relative flex flex-wrap items-center gap-3 px-3 py-3 sm:flex-nowrap">
-        <span
-          aria-hidden="true"
-          className="grid size-11 shrink-0 place-items-center rounded-full text-sm font-extrabold"
-          style={{
-            background: `color-mix(in oklab, ${cor} 18%, var(--color-superficie))`,
-            color: cor,
-            border: `2px solid color-mix(in oklab, ${cor} 45%, transparent)`,
-          }}
-        >
-          {iniciais(membro.nome)}
-        </span>
+        <Avatar
+          cor={cor}
+          nome={membro.nome}
+          fotoChave={membro.fotoAtualizadaEm ? chaveDaFoto(membro.usuarioId) : null}
+          versao={fotosVersao}
+        />
 
         <div className="min-w-40 flex-1">
           <p className="flex flex-wrap items-center gap-2 text-base font-bold">
@@ -1029,10 +1061,12 @@ function FormularioDeConvite({
  */
 function AtividadeRecente({
   eventos,
-  nomePorUsuario,
+  membroPorUsuario,
+  fotosVersao,
 }: {
   eventos: EventoDaEquipe[] | null;
-  nomePorUsuario: Map<string, string>;
+  membroPorUsuario: Map<string, Membro>;
+  fotosVersao: number;
 }) {
   return (
     <Secao
@@ -1055,7 +1089,8 @@ function AtividadeRecente({
       ) : (
         <ul className="flex flex-col gap-2">
           {eventos.map((evento) => {
-            const nome = nomePorUsuario.get(evento.usuarioId) ?? 'alguém que já saiu da equipe';
+            const membro = membroPorUsuario.get(evento.usuarioId);
+            const nome = membro?.nome ?? 'alguém que já saiu da equipe';
             const cor = corDoAvatar(evento.usuarioId);
             return (
               <li
@@ -1063,17 +1098,13 @@ function AtividadeRecente({
                 className="flex items-center gap-3 rounded-2xl border-2 px-4 py-3"
                 style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
               >
-                <span
-                  aria-hidden="true"
-                  className="grid size-9 shrink-0 place-items-center rounded-full text-xs font-extrabold"
-                  style={{
-                    background: `color-mix(in oklab, ${cor} 18%, var(--color-superficie))`,
-                    color: cor,
-                    border: `2px solid color-mix(in oklab, ${cor} 45%, transparent)`,
-                  }}
-                >
-                  {iniciais(nome)}
-                </span>
+                <Avatar
+                  cor={cor}
+                  nome={nome}
+                  fotoChave={membro?.fotoAtualizadaEm ? chaveDaFoto(membro.usuarioId) : null}
+                  versao={fotosVersao}
+                  tamanho="sm"
+                />
                 <span className="min-w-40 flex-1">
                   <span className="block text-sm font-bold">{evento.detalhe}</span>
                   <span className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>

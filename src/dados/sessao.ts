@@ -15,6 +15,7 @@ export type Vinculo = {
 
 export type EstadoDaConta = {
   carregando: boolean;
+  usuarioId: string | null;
   email: string | null;
   vinculo: Vinculo | null;
   /**
@@ -24,11 +25,13 @@ export type EstadoDaConta = {
    * não sincroniza mais nada.
    */
   saiuDaEquipe: boolean;
+  /** Quando a própria pessoa tem foto de perfil — mesma coluna que a equipe enxerga dela. */
+  fotoAtualizadaEm: string | null;
 };
 
-type Leitura = Pick<EstadoDaConta, 'vinculo' | 'saiuDaEquipe'>;
+type Leitura = Pick<EstadoDaConta, 'vinculo' | 'saiuDaEquipe' | 'fotoAtualizadaEm'>;
 
-const SEM_VINCULO: Leitura = { vinculo: null, saiuDaEquipe: false };
+const SEM_VINCULO: Leitura = { vinculo: null, saiuDaEquipe: false, fotoAtualizadaEm: null };
 
 /**
  * O vínculo desta pessoa — e só dela.
@@ -47,7 +50,7 @@ async function lerVinculo(usuarioId: string): Promise<Leitura> {
 
   const { data, error } = await supabase
     .from('membros')
-    .select('papel, ministerio_id, apagado_em, ministerios(nome)')
+    .select('papel, ministerio_id, apagado_em, foto_atualizada_em, ministerios(nome)')
     .eq('usuario_id', usuarioId)
     // Quem participa de mais de um ministério fica com o vínculo ativo à
     // frente; o encerrado só aparece quando não sobrou nenhum ativo.
@@ -56,7 +59,7 @@ async function lerVinculo(usuarioId: string): Promise<Leitura> {
     .maybeSingle();
 
   if (error || !data) return SEM_VINCULO;
-  if (data.apagado_em) return { vinculo: null, saiuDaEquipe: true };
+  if (data.apagado_em) return { vinculo: null, saiuDaEquipe: true, fotoAtualizadaEm: null };
 
   const ministerios = data.ministerios as unknown as { nome: string } | { nome: string }[] | null;
   const nome = Array.isArray(ministerios) ? ministerios[0]?.nome : ministerios?.nome;
@@ -68,15 +71,18 @@ async function lerVinculo(usuarioId: string): Promise<Leitura> {
       papel: data.papel as Vinculo['papel'],
     },
     saiuDaEquipe: false,
+    fotoAtualizadaEm: (data.foto_atualizada_em as string | null) ?? null,
   };
 }
 
 export function useConta(): EstadoDaConta & { recarregar: () => void } {
   const [estado, setEstado] = useState<EstadoDaConta>({
     carregando: Boolean(supabase),
+    usuarioId: null,
     email: null,
     vinculo: null,
     saiuDaEquipe: false,
+    fotoAtualizadaEm: null,
   });
   const [versao, setVersao] = useState(0);
 
@@ -88,7 +94,12 @@ export function useConta(): EstadoDaConta & { recarregar: () => void } {
       const { data } = await supabase!.auth.getUser();
       const leitura = data.user ? await lerVinculo(data.user.id) : SEM_VINCULO;
       if (vivo) {
-        setEstado({ carregando: false, email: data.user?.email ?? null, ...leitura });
+        setEstado({
+          carregando: false,
+          usuarioId: data.user?.id ?? null,
+          email: data.user?.email ?? null,
+          ...leitura,
+        });
       }
     };
 

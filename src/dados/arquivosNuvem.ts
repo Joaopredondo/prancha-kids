@@ -2,12 +2,13 @@ import { chaveDaFoto, chaveDaVoz, lerArquivo, salvarArquivo } from './arquivos';
 import { supabase } from './supabase';
 
 /**
- * Fotos das crianças e vozes gravadas, no bucket privado.
+ * Fotos das crianças, fotos de perfil da equipe e vozes gravadas, no bucket privado.
  *
  * O bucket não é público e o caminho começa sempre pelo ministério — é o que a
- * regra de acesso confere. Foto de menor não pode ficar em endereço público nem
- * adivinhável, então nada aqui devolve URL: o arquivo é baixado e guardado no
- * aparelho, e a tela continua lendo do IndexedDB.
+ * regra de acesso confere. Nada aqui devolve URL, nem para a foto de perfil de
+ * um adulto: o arquivo é baixado e guardado no aparelho, e a tela continua
+ * lendo do IndexedDB — mesmo caminho de código para as três coisas, só a
+ * pasta dentro do ministério muda (`fotos/`, `perfis/`, `vozes/`).
  */
 
 const BUCKET = 'arquivos';
@@ -17,6 +18,10 @@ const caminhoDaFoto = (ministerioId: string, criancaId: string) =>
 
 const caminhoDaVoz = (ministerioId: string, cardId: string) =>
   `${ministerioId}/vozes/${cardId}`;
+
+/** Pasta própria, separada da foto de criança — mesmo bucket, mesma regra de acesso. */
+const caminhoDoAvatar = (ministerioId: string, usuarioId: string) =>
+  `${ministerioId}/perfis/${usuarioId}`;
 
 async function enviar(caminho: string, blob: Blob): Promise<void> {
   if (!supabase) return;
@@ -49,6 +54,31 @@ export async function baixarFotoSeFaltar(
   if (!blob) return false;
   await salvarArquivo(chaveDaFoto(criancaId), blob);
   return true;
+}
+
+/** Sobe a foto de perfil de quem chama, se ela existir neste aparelho. */
+export async function enviarFotoDoMembro(ministerioId: string, usuarioId: string): Promise<void> {
+  const blob = await lerArquivo(chaveDaFoto(usuarioId));
+  if (!blob) return;
+  await enviar(caminhoDoAvatar(ministerioId, usuarioId), blob);
+}
+
+/** Traz a foto de um colega de equipe quando o aparelho ainda não tem. */
+export async function baixarFotoDoMembroSeFaltar(
+  ministerioId: string,
+  usuarioId: string,
+): Promise<boolean> {
+  if (await lerArquivo(chaveDaFoto(usuarioId))) return false;
+  const blob = await baixar(caminhoDoAvatar(ministerioId, usuarioId));
+  if (!blob) return false;
+  await salvarArquivo(chaveDaFoto(usuarioId), blob);
+  return true;
+}
+
+/** Apaga a foto de perfil da nuvem — chamado antes de zerar `foto_atualizada_em`. */
+export async function removerFotoDoMembro(ministerioId: string, usuarioId: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.storage.from(BUCKET).remove([caminhoDoAvatar(ministerioId, usuarioId)]);
 }
 
 export async function enviarVoz(ministerioId: string, cardId: string): Promise<void> {
