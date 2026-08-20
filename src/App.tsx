@@ -49,12 +49,16 @@ export default function App() {
   const [configAberta, setConfigAberta] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
   // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
-  // Exceto vindo de um link de convite: aí precisa cair direto no portão, ou
-  // o `?convite=` no endereço nunca seria lido por ninguém — a prancha
-  // não olha a URL, só o `PortaoDoVoluntario` faz isso (`lerConviteDaUrl`).
-  const [vista, setVista] = useState<Vista>(() =>
-    new URLSearchParams(window.location.search).has('convite') ? 'login' : 'prancha',
-  );
+  // Duas exceções, ambas precisam do portão aberto de cara ou a prancha
+  // nunca chegaria a ler a URL: link de convite (`?convite=` na query) e
+  // link de recuperação de senha (o Supabase devolve `type=recovery` no
+  // hash — `PortaoDoVoluntario` escuta o evento real via `aoRecuperarSenha`,
+  // isto aqui só garante que ele já esteja montado quando o evento chegar).
+  const [vista, setVista] = useState<Vista>(() => {
+    if (new URLSearchParams(window.location.search).has('convite')) return 'login';
+    if (window.location.hash.includes('type=recovery')) return 'login';
+    return 'prancha';
+  });
   /** Para onde voltar quando o login é aberto pelas Configurações. */
   const [depoisDeEntrar, setDepoisDeEntrar] = useState<Vista>('prancha');
   const [destrancado, setDestrancado] = useState(() => estaDestrancado());

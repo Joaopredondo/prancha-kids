@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
 import logo from '../assets/ipi.png';
 import { conferirPin, temPin } from '../dados/seguranca';
-import { entrar } from '../dados/sessao';
+import { aoRecuperarSenha, entrar } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
 import { AceitarConvite } from './AceitarConvite';
 import { CampoDeTexto } from './CampoDeTexto';
 import { CenaDaPrancha } from './CenaDaPrancha';
+import { RecuperarSenha } from './RecuperarSenha';
 import type { Momento } from '../three/cenaDaPrancha';
 
-type Caminho = 'conta' | 'codigo' | 'convite';
+type Caminho = 'conta' | 'codigo' | 'convite' | 'recuperar';
 type Campo = 'email' | 'senha';
 
 /**
@@ -81,6 +82,8 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
   const [campoFocado, setCampoFocado] = useState<Campo | null>(null);
   /** Recusa é reação de um instante, não estado: some sozinha. */
   const [recusando, setRecusando] = useState(false);
+  /** Verdadeiro só depois que o Supabase confirma a sessão de recuperação vinda do e-mail. */
+  const [sessaoDeRecuperacao, setSessaoDeRecuperacao] = useState(false);
 
   useEffect(() => {
     if (tentativasErradas === 0) return;
@@ -88,6 +91,14 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
     const id = window.setTimeout(() => setRecusando(false), 1400);
     return () => window.clearTimeout(id);
   }, [tentativasErradas]);
+
+  // O link do e-mail pode cair aqui a qualquer momento, mesmo com a tela já
+  // aberta noutra aba: o Supabase lê o token da URL sozinho e dispara o
+  // evento — não dá pra saber isso na hora de montar o componente.
+  useEffect(() => aoRecuperarSenha(() => {
+    setSessaoDeRecuperacao(true);
+    setCaminho('recuperar');
+  }), []);
 
   // A cena do painel responde ao formulário. A ordem importa: a comemoração
   // ganha da recusa, e a recusa ganha do campo em foco — senão a reação ao
@@ -217,10 +228,10 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
             </p>
           </div>
 
-          {/* As abas somem durante o convite: ali a pessoa está num fluxo de
-              duas etapas, e uma aba ao lado convida a sair dele no meio. A
-              saída existe, mas como link discreto no fim do formulário. */}
-          {comConta && caminho !== 'convite' && (
+          {/* As abas somem durante o convite e a recuperação: ali a pessoa
+              está num fluxo de etapas, e uma aba ao lado convida a sair dele
+              no meio. A saída existe, mas como link discreto no formulário. */}
+          {comConta && caminho !== 'convite' && caminho !== 'recuperar' && (
             <div
               className="flex gap-1 rounded-full border-2 p-1"
               style={{ borderColor: 'var(--color-linha)' }}
@@ -258,6 +269,19 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                 setErro(null);
               }}
             />
+          ) : caminho === 'recuperar' && comConta ? (
+            <RecuperarSenha
+              key="recuperar"
+              pronto={sessaoDeRecuperacao}
+              semMovimento={Boolean(semMovimento)}
+              aoFocarCampo={setCampoFocado}
+              aoErrar={() => setTentativasErradas((n) => n + 1)}
+              aoEntrar={abrirAPorta}
+              aoVoltar={() => {
+                setCaminho('conta');
+                setErro(null);
+              }}
+            />
           ) : caminho === 'conta' && comConta ? (
             <motion.form
               key="conta"
@@ -289,18 +313,31 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
                   setEmailInvalido(dados.email.length > 0 && !dados.email.includes('@'));
                 }}
               />
-              <CampoDeTexto
-                rotulo="Senha"
-                tipo="password"
-                autoCompletar="current-password"
-                valor={dados.senha}
-                aoFocar={() => setCampoFocado('senha')}
-                aoSair={() => setCampoFocado(null)}
-                aoMudar={(v) => {
-                  setDados({ ...dados, senha: v });
-                  setErro(null);
-                }}
-              />
+              <div>
+                <CampoDeTexto
+                  rotulo="Senha"
+                  tipo="password"
+                  autoCompletar="current-password"
+                  valor={dados.senha}
+                  aoFocar={() => setCampoFocado('senha')}
+                  aoSair={() => setCampoFocado(null)}
+                  aoMudar={(v) => {
+                    setDados({ ...dados, senha: v });
+                    setErro(null);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaminho('recuperar');
+                    setErro(null);
+                  }}
+                  className="mt-1.5 cursor-pointer text-xs font-bold underline underline-offset-2"
+                  style={{ color: 'var(--color-texto-suave)' }}
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
 
               <button
                 type="submit"
