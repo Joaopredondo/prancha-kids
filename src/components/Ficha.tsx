@@ -17,6 +17,7 @@ import {
   alternarMultiplo,
   alternarUnico,
   fichaVazia,
+  resumoCurto,
   type Ficha as TipoDaFicha,
   type Marcacao,
   type TipoDeMarcacao,
@@ -64,6 +65,16 @@ export function Ficha() {
   const leitura = modo === 'leitura';
   const listadas = useMemo(() => filtrarFichas(anteriores, filtro), [anteriores, filtro]);
   const dias = useMemo(() => diasComFicha(anteriores), [anteriores]);
+
+  /**
+   * As últimas 3 fichas desta criança, para o briefing de quem vai atendê-la
+   * de novo. Só faz sentido numa ficha nova (`!leitura`): quem está lendo uma
+   * ficha salva já está olhando o histórico dela na lista de baixo.
+   */
+  const historico = useMemo(() => {
+    if (leitura || !ficha.perfilId) return [];
+    return anteriores.filter((a) => a.perfilId === ficha.perfilId && a.id !== ficha.id).slice(0, 3);
+  }, [anteriores, ficha.perfilId, ficha.id, leitura]);
 
   const mudar = <C extends keyof TipoDaFicha>(campo: C, valor: TipoDaFicha[C]) =>
     setFicha((atual) => ({ ...atual, [campo]: valor }));
@@ -156,6 +167,8 @@ export function Ficha() {
           if (ficha.perfilId === perfil.id) novaFicha(null);
         }}
       />
+
+      {historico.length > 0 && <Briefing fichas={historico} aoAbrir={abrir} />}
 
       {/* `fieldset disabled` desliga todos os campos de uma vez no modo leitura. */}
       <fieldset disabled={leitura} className="contents">
@@ -675,6 +688,47 @@ function Selecao({
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * "O que aconteceu da última vez" — para quem vai atender a criança sem ter
+ * visto a ficha anterior. Ficha escrita e nunca lida de novo não ajuda
+ * ninguém; isto é o que transforma o registro em briefing.
+ */
+function Briefing({
+  fichas,
+  aoAbrir,
+}: {
+  fichas: TipoDaFicha[];
+  aoAbrir: (ficha: TipoDaFicha) => void;
+}) {
+  return (
+    <section
+      className="rounded-3xl border-2 p-4"
+      style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+    >
+      <h2 className="text-sm font-bold" style={{ color: 'var(--color-texto-suave)' }}>
+        📋 Últimas vezes
+      </h2>
+      <ul className="mt-3 flex flex-col gap-2">
+        {fichas.map((anterior) => (
+          <li key={anterior.id}>
+            <button
+              type="button"
+              onClick={() => aoAbrir(anterior)}
+              className="w-full cursor-pointer rounded-2xl border-2 px-3 py-2 text-left text-sm"
+              style={{ borderColor: 'var(--color-linha)', background: 'var(--color-superficie)' }}
+            >
+              <span className="font-bold">
+                {new Date(anterior.data).toLocaleDateString('pt-BR')}
+              </span>{' '}
+              <span style={{ color: 'var(--color-texto-suave)' }}>{resumoCurto(anterior)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

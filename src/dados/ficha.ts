@@ -196,6 +196,39 @@ export function alternarMultiplo<T>(atuais: T[], escolha: T): T[] {
 }
 
 /**
+ * Resume uma ficha numa linha, para o briefing de quem vai atender a criança
+ * de novo — "o que aconteceu da última vez", não o formulário inteiro.
+ *
+ * Só usa o que a ficha realmente tem preenchido: nada aqui interpreta ou
+ * completa lacuna. Se a ficha está quase em branco, a linha fica curta — é
+ * honesto, e melhor que inventar "tudo bem" para o que ninguém registrou.
+ */
+export function resumoCurto(ficha: Ficha): string {
+  const partes: string[] = [];
+
+  if (ficha.estado) partes.push(ROTULOS.estado[ficha.estado].toLowerCase());
+
+  if (ficha.saida && ficha.saida !== 'nao') {
+    partes.push(ROTULOS.saida[ficha.saida].toLowerCase());
+  }
+
+  if (ficha.comunicacao.length > 0) {
+    const meios = ficha.comunicacao.map((c) => ROTULOS.comunicacao[c].toLowerCase());
+    partes.push(`comunicou por ${meios.join(', ')}`);
+  }
+
+  // O texto livre de manejo é literalmente "o que funcionou" — a fonte mais
+  // direta que existe para um briefing, sem precisar adivinhar nada.
+  const manejo = ficha.manejo.trim();
+  if (manejo) {
+    partes.push(manejo.length > 70 ? `${manejo.slice(0, 70)}…` : manejo);
+  }
+
+  if (partes.length === 0) return 'Sem registro preenchido nesta ficha.';
+  return partes.join(', ');
+}
+
+/**
  * Transforma a linha do tempo em texto corrido, para o voluntário colar na
  * descrição do comportamento em vez de escrever de memória depois do culto.
  */
