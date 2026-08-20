@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { corDoAvatar, iniciais } from '../dados/avatar';
+import { Avatar } from './Avatar';
+import { apagarArquivo, chaveDaFoto, reduzirImagem, salvarArquivo } from '../dados/arquivos';
+import { enviarFotoDoMembro, removerFotoDoMembro } from '../dados/arquivosNuvem';
+import { corDoAvatar } from '../dados/avatar';
+import { definirFotoDoMembro } from '../dados/membros';
 import { convidar, sair, useConta } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
 import { useSincronizacao } from '../hooks/useSincronizacao';
@@ -15,7 +19,8 @@ import { useSincronizacao } from '../hooks/useSincronizacao';
  * telas diferentes.
  */
 export function Conta({ onEntrar }: { onEntrar: () => void }) {
-  const { carregando, email, vinculo, saiuDaEquipe, recarregar } = useConta();
+  const { carregando, usuarioId, email, vinculo, saiuDaEquipe, fotoAtualizadaEm, recarregar } =
+    useConta();
   const { pendentes, ocupado, ultimo, sincronizarAgora, enviarTudo } = useSincronizacao(
     vinculo?.ministerioId ?? null,
   );
@@ -23,6 +28,35 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
   const [convite, setConvite] = useState('');
   const [convidando, setConvidando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** Sobrepõe o que o servidor diz, até `recarregar()` confirmar — sem isso a
+      foto nova só aparece depois de um round-trip inteiro. */
+  const [fotoLocal, setFotoLocal] = useState<{ tem: boolean; versao: number } | null>(null);
+  const seletorDeArquivo = useRef<HTMLInputElement>(null);
+
+  const temFoto = fotoLocal?.tem ?? Boolean(fotoAtualizadaEm);
+  const versaoDaFoto = fotoLocal?.versao ?? 0;
+
+  const trocarFoto = async (arquivo: File | undefined) => {
+    if (!arquivo || !usuarioId || !vinculo) return;
+    // Reduz para 256 px antes de guardar: foto crua de celular tem alguns MB.
+    const reduzida = await reduzirImagem(arquivo);
+    await salvarArquivo(chaveDaFoto(usuarioId), reduzida);
+    setFotoLocal((atual) => ({ tem: true, versao: (atual?.versao ?? 0) + 1 }));
+    try {
+      await enviarFotoDoMembro(vinculo.ministerioId, usuarioId);
+      setAviso(await definirFotoDoMembro(true));
+    } catch {
+      setAviso('Não deu para enviar a foto. Ela fica só neste aparelho por enquanto.');
+    }
+  };
+
+  const removerFoto = async () => {
+    if (!usuarioId) return;
+    await apagarArquivo(chaveDaFoto(usuarioId));
+    setFotoLocal((atual) => ({ tem: false, versao: (atual?.versao ?? 0) + 1 }));
+    if (vinculo) await removerFotoDoMembro(vinculo.ministerioId, usuarioId);
+    setAviso(await definirFotoDoMembro(false));
+  };
 
   if (!temNuvem()) {
     return (
@@ -47,7 +81,7 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
           onClick={onEntrar}
           className="flex w-full cursor-pointer items-center gap-3 rounded-2xl px-1 py-1 text-left"
         >
-          <Avatar cor="var(--color-texto-suave)" iniciais="?" />
+          <Avatar cor="var(--color-texto-suave)" nome="?" fotoChave={null} />
           <span className="min-w-0 flex-1">
             <span className="block text-base font-extrabold">Entrar com minha conta</span>
             <span className="block text-xs" style={{ color: 'var(--color-texto-suave)' }}>
@@ -67,7 +101,7 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
     return (
       <Cartao>
         <LinhaDeIdentidade
-          avatar={<Avatar cor="var(--color-urgencia)" iniciais={iniciais(email.split('@')[0])} />}
+          avatar={<Avatar cor="var(--color-urgencia)" nome={email.split('@')[0]} fotoChave={null} />}
           rotulo={email}
           legenda="Não está mais na equipe"
           corDaLegenda="var(--color-urgencia)"
@@ -86,7 +120,32 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
   return (
     <Cartao>
       <LinhaDeIdentidade
-        avatar={<Avatar cor={cor} iniciais={iniciais(email.split('@')[0])} />}
+        avatar={
+          usuarioId && vinculo ? (
+            <button
+              type="button"
+              onClick={() => seletorDeArquivo.current?.click()}
+              aria-label="Trocar foto de perfil"
+              className="relative shrink-0 cursor-pointer rounded-full"
+            >
+              <Avatar
+                cor={cor}
+                nome={email.split('@')[0]}
+                fotoChave={chaveDaFoto(usuarioId)}
+                versao={versaoDaFoto}
+              />
+              <span
+                aria-hidden="true"
+                className="absolute -right-0.5 -bottom-0.5 grid size-4.5 place-items-center rounded-full border-2 text-[9px]"
+                style={{ borderColor: 'var(--color-fundo)', background: 'var(--color-superficie)' }}
+              >
+                📷
+              </span>
+            </button>
+          ) : (
+            <Avatar cor={cor} nome={email.split('@')[0]} fotoChave={null} />
+          )
+        }
         rotulo={email}
         legenda={
           vinculo
@@ -94,6 +153,24 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
             : 'Sem ministério vinculado'
         }
       />
+
+      {usuarioId && vinculo && (
+        <>
+          <input
+            ref={seletorDeArquivo}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              void trocarFoto(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+          {temFoto && (
+            <BotaoTexto rotulo="Remover foto" aoTocar={removerFoto} />
+          )}
+        </>
+      )}
 
       <div className="mt-3 flex items-center gap-2">
         <button
@@ -247,22 +324,6 @@ function LinhaDeIdentidade({
         )}
       </span>
     </div>
-  );
-}
-
-function Avatar({ cor, iniciais: texto }: { cor: string; iniciais: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid size-11 shrink-0 place-items-center rounded-full text-sm font-extrabold"
-      style={{
-        background: `color-mix(in oklab, ${cor} 18%, var(--color-superficie))`,
-        color: cor,
-        border: `2px solid color-mix(in oklab, ${cor} 45%, transparent)`,
-      }}
-    >
-      {texto}
-    </span>
   );
 }
 

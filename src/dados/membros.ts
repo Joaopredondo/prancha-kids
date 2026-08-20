@@ -12,6 +12,8 @@ export type Membro = {
   desde: string;
   /** Trava as ações da própria linha: ninguém muda o próprio papel nem se remove — nem a RLS deixa. */
   souEu: boolean;
+  /** Quando a pessoa tem foto de perfil — null é "sem foto". */
+  fotoAtualizadaEm: string | null;
 };
 
 export type Convite = { email: string; papel: Papel; criadoEm: string };
@@ -49,7 +51,7 @@ export async function listarEquipe(ministerioId: string): Promise<Resultado<Equi
 
   const { data: linhas, error } = await supabase
     .from('membros')
-    .select('usuario_id, nome, email, papel, criado_em')
+    .select('usuario_id, nome, email, papel, criado_em, foto_atualizada_em')
     .eq('ministerio_id', ministerioId)
     .is('apagado_em', null);
 
@@ -66,6 +68,7 @@ export async function listarEquipe(ministerioId: string): Promise<Resultado<Equi
         papel: linha.papel as Papel,
         desde: linha.criado_em as string,
         souEu: linha.usuario_id === meuId,
+        fotoAtualizadaEm: (linha.foto_atualizada_em as string | null) ?? null,
       };
     })
     // Coordenação primeiro; dentro do mesmo papel, alfabética pelo nome exibido.
@@ -165,4 +168,19 @@ export async function cancelarConvite(
     return 'Não foi possível cancelar — você não tem permissão para isso.';
   }
   return null;
+}
+
+/**
+ * Avisa que a própria foto de perfil mudou (ou foi removida).
+ *
+ * Passa por uma função do banco (`definir_foto_do_membro`, migração 0008),
+ * não por um `update` direto: a policy de update de `membros` é só para
+ * coordenador administrar a equipe, e explicitamente barra a própria linha —
+ * a função é o único jeito de a pessoa gravar algo na própria linha sem abrir
+ * uma brecha para ela mudar o próprio papel também.
+ */
+export async function definirFotoDoMembro(tenhoFoto: boolean): Promise<string | null> {
+  if (!supabase) return SEM_NUVEM;
+  const { error } = await supabase.rpc('definir_foto_do_membro', { tenho_foto: tenhoFoto });
+  return error ? traduzirErro(error.message) : null;
 }
