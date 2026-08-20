@@ -47,7 +47,12 @@ export default function App() {
   const semMovimento = useReducedMotion();
   const [configAberta, setConfigAberta] = useState(false);
   // A vista não é salva: quem abre o app cai sempre na prancha, não na ficha.
-  const [vista, setVista] = useState<Vista>('prancha');
+  // Exceto vindo de um link de convite: aí precisa cair direto no portão, ou
+  // o `?convite=` no endereço nunca seria lido por ninguém — a prancha
+  // não olha a URL, só o `PortaoDoVoluntario` faz isso (`lerConviteDaUrl`).
+  const [vista, setVista] = useState<Vista>(() =>
+    new URLSearchParams(window.location.search).has('convite') ? 'login' : 'prancha',
+  );
   /** Para onde voltar quando o login é aberto pelas Configurações. */
   const [depoisDeEntrar, setDepoisDeEntrar] = useState<Vista>('prancha');
   const [destrancado, setDestrancado] = useState(() => estaDestrancado());
