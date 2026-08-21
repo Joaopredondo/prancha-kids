@@ -14,6 +14,9 @@ export type Membro = {
   souEu: boolean;
   /** Quando a pessoa tem foto de perfil — null é "sem foto". */
   fotoAtualizadaEm: string | null;
+  /** Nascimento em `YYYY-MM-DD` — null é "não informou". A idade é calculada. */
+  nascimento: string | null;
+  profissao: string;
 };
 
 export type Convite = { email: string; papel: Papel; criadoEm: string };
@@ -51,7 +54,9 @@ export async function listarEquipe(ministerioId: string): Promise<Resultado<Equi
 
   const { data: linhas, error } = await supabase
     .from('membros')
-    .select('usuario_id, nome, email, papel, criado_em, foto_atualizada_em')
+    .select(
+      'usuario_id, nome, email, papel, criado_em, foto_atualizada_em, nascimento, profissao',
+    )
     .eq('ministerio_id', ministerioId)
     .is('apagado_em', null);
 
@@ -69,6 +74,8 @@ export async function listarEquipe(ministerioId: string): Promise<Resultado<Equi
         desde: linha.criado_em as string,
         souEu: linha.usuario_id === meuId,
         fotoAtualizadaEm: (linha.foto_atualizada_em as string | null) ?? null,
+        nascimento: (linha.nascimento as string | null) ?? null,
+        profissao: (linha.profissao as string) ?? '',
       };
     })
     // Coordenação primeiro; dentro do mesmo papel, alfabética pelo nome exibido.
@@ -183,4 +190,49 @@ export async function definirFotoDoMembro(tenhoFoto: boolean): Promise<string | 
   if (!supabase) return SEM_NUVEM;
   const { error } = await supabase.rpc('definir_foto_do_membro', { tenho_foto: tenhoFoto });
   return error ? traduzirErro(error.message) : null;
+}
+
+/**
+ * Grava os dados pessoais da própria pessoa: nome, nascimento e profissão.
+ *
+ * Mesma função do banco que a foto (`definir_dados_do_membro`, migração 0009),
+ * pelo mesmo motivo: a policy de update de `membros` barra a própria linha, e
+ * a função é o único jeito de gravar nela sem abrir brecha para mudar papel.
+ * Como é dado da pessoa, não do vínculo, a função atualiza a linha dela em
+ * todos os ministérios de uma vez.
+ *
+ * `nascimento` vira `null` quando vem vazio: é o "não informou" da coluna.
+ */
+export async function definirDadosDoMembro(
+  nome: string,
+  nascimento: string,
+  profissao: string,
+): Promise<string | null> {
+  if (!supabase) return SEM_NUVEM;
+  const { error } = await supabase.rpc('definir_dados_do_membro', {
+    novo_nome: nome,
+    novo_nascimento: nascimento || null,
+    nova_profissao: profissao,
+  });
+  return error ? traduzirErro(error.message) : null;
+}
+
+/**
+ * Idade da pessoa hoje, calculada do nascimento — nunca guardada, para não
+ * desatualizar a cada aniversário. Vazio quando a data não foi informada (ou
+ * não veio em `YYYY-MM-DD`, que é o que o `<input type="date">` entrega).
+ */
+export function idadeDoMembro(nascimento: string | null): string {
+  if (!nascimento) return '';
+  const [ano, mes, dia] = nascimento.split('-').map(Number);
+  if (!ano || !mes || !dia) return '';
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - ano;
+  // Aniversário deste ano ainda não chegou: mês maior, ou mesmo mês com dia
+  // maior. Mês do Date é 0-based, daí o +1.
+  if (hoje.getMonth() + 1 < mes || (hoje.getMonth() + 1 === mes && hoje.getDate() < dia)) {
+    anos -= 1;
+  }
+  if (anos < 0) return '';
+  return anos === 1 ? '1 ano' : `${anos} anos`;
 }

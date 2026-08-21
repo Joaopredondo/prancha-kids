@@ -4,7 +4,7 @@ import { Avatar } from './Avatar';
 import { apagarArquivo, chaveDaFoto, reduzirImagem, salvarArquivo } from '../dados/arquivos';
 import { enviarFotoDoMembro, removerFotoDoMembro } from '../dados/arquivosNuvem';
 import { corDoAvatar } from '../dados/avatar';
-import { definirFotoDoMembro } from '../dados/membros';
+import { definirDadosDoMembro, definirFotoDoMembro, idadeDoMembro } from '../dados/membros';
 import { convidar, sair, useConta } from '../dados/sessao';
 import { temNuvem } from '../dados/supabase';
 import { useSincronizacao } from '../hooks/useSincronizacao';
@@ -19,14 +19,29 @@ import { useSincronizacao } from '../hooks/useSincronizacao';
  * telas diferentes.
  */
 export function Conta({ onEntrar }: { onEntrar: () => void }) {
-  const { carregando, usuarioId, email, vinculo, saiuDaEquipe, fotoAtualizadaEm, recarregar } =
-    useConta();
+  const {
+    carregando,
+    usuarioId,
+    email,
+    vinculo,
+    saiuDaEquipe,
+    fotoAtualizadaEm,
+    nome,
+    nascimento,
+    profissao,
+    recarregar,
+  } = useConta();
   const { pendentes, ocupado, ultimo, sincronizarAgora, enviarTudo } = useSincronizacao(
     vinculo?.ministerioId ?? null,
   );
   const [conviteAberto, setConviteAberto] = useState(false);
   const [convite, setConvite] = useState('');
   const [convidando, setConvidando] = useState(false);
+  const [dadosAbertos, setDadosAbertos] = useState(false);
+  /** O formulário nasce da conta a cada abertura: nunca fica velho se a
+      sessão mudar por baixo (outro aparelho, recarregar). */
+  const [meusDados, setMeusDados] = useState({ nome: '', nascimento: '', profissao: '' });
+  const [salvandoDados, setSalvandoDados] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   /** Sobrepõe o que o servidor diz, até `recarregar()` confirmar — sem isso a
       foto nova só aparece depois de um round-trip inteiro. */
@@ -56,6 +71,35 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
     setFotoLocal((atual) => ({ tem: false, versao: (atual?.versao ?? 0) + 1 }));
     if (vinculo) await removerFotoDoMembro(vinculo.ministerioId, usuarioId);
     setAviso(await definirFotoDoMembro(false));
+  };
+
+  const alternarDados = () => {
+    if (!dadosAbertos) {
+      setMeusDados({ nome: nome ?? '', nascimento: nascimento ?? '', profissao: profissao ?? '' });
+    }
+    setDadosAbertos((v) => !v);
+  };
+
+  /**
+   * Escreve direto na nuvem (RPC `definir_dados_do_membro`): dado do
+   * voluntário não tem fila offline como ficha e criança — sem rede, avisa e
+   * não salva, o mesmo comportamento da foto.
+   */
+  const salvarDados = async () => {
+    setSalvandoDados(true);
+    const erro = await definirDadosDoMembro(
+      meusDados.nome.trim(),
+      meusDados.nascimento,
+      meusDados.profissao.trim(),
+    );
+    setSalvandoDados(false);
+    if (erro) {
+      setAviso(erro);
+      return;
+    }
+    setAviso('Dados salvos.');
+    setDadosAbertos(false);
+    recarregar();
   };
 
   if (!temNuvem()) {
@@ -130,7 +174,7 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
             >
               <Avatar
                 cor={cor}
-                nome={email.split('@')[0]}
+                nome={nome || email}
                 fotoChave={chaveDaFoto(usuarioId)}
                 versao={versaoDaFoto}
               />
@@ -143,16 +187,23 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
               </span>
             </button>
           ) : (
-            <Avatar cor={cor} nome={email.split('@')[0]} fotoChave={null} />
+            <Avatar cor={cor} nome={nome || email} fotoChave={null} />
           )
         }
-        rotulo={email}
+        rotulo={nome || email}
         legenda={
           vinculo
             ? `${vinculo.ministerio} · ${vinculo.papel === 'coordenador' ? 'coordenação' : 'voluntário(a)'}`
             : 'Sem ministério vinculado'
         }
       />
+      {/* Com nome preenchido, o e-mail sai do rótulo — mas continua à vista:
+          é o login, e é como a equipe ainda se reconhece. */}
+      {nome && (
+        <p className="mt-1 truncate text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+          {email}
+        </p>
+      )}
 
       {usuarioId && vinculo && (
         <>
@@ -170,6 +221,97 @@ export function Conta({ onEntrar }: { onEntrar: () => void }) {
             <BotaoTexto rotulo="Remover foto" aoTocar={removerFoto} />
           )}
         </>
+      )}
+
+      {usuarioId && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={alternarDados}
+            className="flex min-h-10 w-full cursor-pointer items-center justify-between text-sm font-bold"
+            style={{ color: 'var(--color-texto-suave)' }}
+          >
+            ✎ Meus dados
+            <span
+              aria-hidden="true"
+              className="transition-transform"
+              style={{ transform: dadosAbertos ? 'rotate(180deg)' : 'none' }}
+            >
+              ▾
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {dadosAbertos && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div className="flex flex-col gap-2 pt-1">
+                  <label className="block">
+                    <span className="text-sm font-bold">Nome</span>
+                    <input
+                      type="text"
+                      autoComplete="name"
+                      value={meusDados.nome}
+                      onChange={(e) => setMeusDados({ ...meusDados, nome: e.target.value })}
+                      placeholder="Seu nome"
+                      className="mt-1 min-h-11 w-full rounded-2xl border-2 px-3 text-sm"
+                      style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-bold">Data de nascimento</span>
+                    <input
+                      type="date"
+                      autoComplete="bday"
+                      value={meusDados.nascimento}
+                      onChange={(e) => setMeusDados({ ...meusDados, nascimento: e.target.value })}
+                      className="mt-1 min-h-11 w-full rounded-2xl border-2 px-3 text-sm"
+                      style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+                    />
+                    {/* A idade é calculada da data, nunca digitada: um dado
+                        fixo + um derivado é convite a divergirem. */}
+                    {idadeDoMembro(meusDados.nascimento) && (
+                      <span
+                        className="mt-1 block text-xs"
+                        style={{ color: 'var(--color-texto-suave)' }}
+                      >
+                        {idadeDoMembro(meusDados.nascimento)} hoje
+                      </span>
+                    )}
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-bold">Profissão</span>
+                    <input
+                      type="text"
+                      value={meusDados.profissao}
+                      onChange={(e) => setMeusDados({ ...meusDados, profissao: e.target.value })}
+                      placeholder="Fisioterapeuta, estudante…"
+                      className="mt-1 min-h-11 w-full rounded-2xl border-2 px-3 text-sm"
+                      style={{ borderColor: 'var(--color-linha)', background: 'var(--color-fundo)' }}
+                    />
+                  </label>
+                  <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
+                    O e-mail ({email}) é o seu login e não muda aqui.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={salvandoDados}
+                    onClick={() => void salvarDados()}
+                    className="min-h-10 cursor-pointer rounded-full border-2 text-sm font-bold transition-opacity disabled:opacity-50"
+                    style={{ borderColor: 'var(--color-linha)' }}
+                  >
+                    {salvandoDados ? 'Salvando…' : 'Salvar meus dados'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       )}
 
       <div className="mt-3 flex items-center gap-2">

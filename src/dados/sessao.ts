@@ -27,11 +27,26 @@ export type EstadoDaConta = {
   saiuDaEquipe: boolean;
   /** Quando a própria pessoa tem foto de perfil — mesma coluna que a equipe enxerga dela. */
   fotoAtualizadaEm: string | null;
+  /** Dados pessoais da linha de `membros` — os que a própria pessoa edita em Conta. */
+  nome: string | null;
+  /** Nascimento em `YYYY-MM-DD` — null é "não informou". A idade é calculada. */
+  nascimento: string | null;
+  profissao: string;
 };
 
-type Leitura = Pick<EstadoDaConta, 'vinculo' | 'saiuDaEquipe' | 'fotoAtualizadaEm'>;
+type Leitura = Pick<
+  EstadoDaConta,
+  'vinculo' | 'saiuDaEquipe' | 'fotoAtualizadaEm' | 'nome' | 'nascimento' | 'profissao'
+>;
 
-const SEM_VINCULO: Leitura = { vinculo: null, saiuDaEquipe: false, fotoAtualizadaEm: null };
+const SEM_VINCULO: Leitura = {
+  vinculo: null,
+  saiuDaEquipe: false,
+  fotoAtualizadaEm: null,
+  nome: null,
+  nascimento: null,
+  profissao: '',
+};
 
 /**
  * O vínculo desta pessoa — e só dela.
@@ -50,7 +65,9 @@ async function lerVinculo(usuarioId: string): Promise<Leitura> {
 
   const { data, error } = await supabase
     .from('membros')
-    .select('papel, ministerio_id, apagado_em, foto_atualizada_em, ministerios(nome)')
+    .select(
+      'papel, ministerio_id, apagado_em, foto_atualizada_em, nome, nascimento, profissao, ministerios(nome)',
+    )
     .eq('usuario_id', usuarioId)
     // Quem participa de mais de um ministério fica com o vínculo ativo à
     // frente; o encerrado só aparece quando não sobrou nenhum ativo.
@@ -59,19 +76,33 @@ async function lerVinculo(usuarioId: string): Promise<Leitura> {
     .maybeSingle();
 
   if (error || !data) return SEM_VINCULO;
-  if (data.apagado_em) return { vinculo: null, saiuDaEquipe: true, fotoAtualizadaEm: null };
+  if (data.apagado_em) {
+    return {
+      vinculo: null,
+      saiuDaEquipe: true,
+      fotoAtualizadaEm: null,
+      nome: (data.nome as string) || null,
+      nascimento: (data.nascimento as string | null) ?? null,
+      profissao: (data.profissao as string) ?? '',
+    };
+  }
 
   const ministerios = data.ministerios as unknown as { nome: string } | { nome: string }[] | null;
-  const nome = Array.isArray(ministerios) ? ministerios[0]?.nome : ministerios?.nome;
+  const nomeDoMinisterio = Array.isArray(ministerios)
+    ? ministerios[0]?.nome
+    : ministerios?.nome;
 
   return {
     vinculo: {
       ministerioId: data.ministerio_id as string,
-      ministerio: nome ?? 'Ministério',
+      ministerio: nomeDoMinisterio ?? 'Ministério',
       papel: data.papel as Vinculo['papel'],
     },
     saiuDaEquipe: false,
     fotoAtualizadaEm: (data.foto_atualizada_em as string | null) ?? null,
+    nome: (data.nome as string) || null,
+    nascimento: (data.nascimento as string | null) ?? null,
+    profissao: (data.profissao as string) ?? '',
   };
 }
 
@@ -83,6 +114,9 @@ export function useConta(): EstadoDaConta & { recarregar: () => void } {
     vinculo: null,
     saiuDaEquipe: false,
     fotoAtualizadaEm: null,
+    nome: null,
+    nascimento: null,
+    profissao: '',
   });
   const [versao, setVersao] = useState(0);
 
