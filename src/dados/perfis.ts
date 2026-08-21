@@ -4,18 +4,25 @@ import { enfileirar } from './fila';
 /**
  * Cadastro das crianças atendidas.
  *
- * **Contém dado de saúde de menor** (nome, idade, laudo). Fica só no aparelho,
- * em localStorage, sem servidor.
+ * **Contém dado de saúde de menor** (nome, idade, laudo, alergias,
+ * necessidades de acessibilidade).
  *
  * O perfil é o cadastro atual; a ficha guarda uma **cópia** de nome, idade e
  * laudo do dia em que foi preenchida. Corrigir o perfil depois não reescreve o
  * que já foi registrado — histórico de acompanhamento não pode mudar sozinho.
+ * Alergia e acessibilidade são a exceção consciente: a ficha as mostra como
+ * aviso fixo lendo o cadastro atual, porque aviso de segurança corrigido vale
+ * mais que aviso de segurança fiel ao dia do cadastro.
  */
 export type Perfil = {
   id: string;
   nome: string;
   idade: string;
   laudo: string;
+  /** Alergias e restrições (alimento, medicação, inseto…). A ficha avisa. */
+  alergia: string;
+  /** Necessidades de acessibilidade (mobilidade, visão, apoio…). A ficha avisa. */
+  acessibilidade: string;
   /** Foto opcional; o arquivo em si mora no IndexedDB (`arquivos.ts`). */
   temFoto?: boolean;
   criadoEm: number;
@@ -27,10 +34,26 @@ export type Perfil = {
 
 const CHAVE = 'prancha-kids:perfis';
 
+/** O que está de fato no localStorage: cadastro gravado antes de
+ * alergia/acessibilidade existirem não tem os campos. */
+type PerfilGravado = Omit<Perfil, 'alergia' | 'acessibilidade'> &
+  Partial<Pick<Perfil, 'alergia' | 'acessibilidade'>>;
+
 function ler(): Record<string, Perfil> {
   try {
     const bruto = localStorage.getItem(CHAVE);
-    return bruto ? (JSON.parse(bruto) as Record<string, Perfil>) : {};
+    const gravados = bruto ? (JSON.parse(bruto) as Record<string, PerfilGravado>) : {};
+    // Normaliza na leitura para o type não mentir na tela — em todo lugar que
+    // lê, `''` e "nunca preenchido" precisam ser a mesma coisa.
+    const perfis: Record<string, Perfil> = {};
+    for (const id of Object.keys(gravados)) {
+      perfis[id] = {
+        ...gravados[id],
+        alergia: gravados[id].alergia ?? '',
+        acessibilidade: gravados[id].acessibilidade ?? '',
+      };
+    }
+    return perfis;
   } catch {
     return {};
   }
@@ -50,6 +73,8 @@ export function perfilVazio(): Perfil {
     nome: '',
     idade: '',
     laudo: '',
+    alergia: '',
+    acessibilidade: '',
     criadoEm: Date.now(),
     atualizadoEm: Date.now(),
     apagadoEm: null,

@@ -147,6 +147,13 @@ export function Ficha() {
     setCartao({ nome: perfil.nome, texto: gerarCartao(perfil, ficha, rotina) });
   };
 
+  /**
+   * Alergia e necessidade vêm do cadastro atual, não da cópia do dia:
+   * correção no cadastro chega à ficha seguinte sem ninguém redigitar. O
+   * registro do próprio dia continua no campo "Observações de segurança".
+   */
+  const perfilAtivo = perfilPorId(ficha.perfilId);
+
   return (
     <div className="flex flex-col gap-5 px-3 pb-6 sm:px-4">
       <p className="text-sm" style={{ color: 'var(--color-texto-suave)' }}>
@@ -182,6 +189,28 @@ export function Ficha() {
           if (ficha.perfilId === perfil.id) novaFicha(null);
         }}
       />
+
+      {/* Aviso de segurança: a primeira coisa que o voluntário precisa saber
+          sobre esta criança, não um campo a procurar. Borda de urgência (o
+          vermelho "parar" do Fitzgerald) e sem `print:hidden` — a ficha
+          impressa precisa avisar tanto quanto a tela. */}
+      {perfilAtivo && (perfilAtivo.alergia || perfilAtivo.acessibilidade) && (
+        <div
+          className="flex flex-col gap-1 rounded-2xl border-2 p-3 text-sm"
+          style={{ borderColor: 'var(--color-urgencia)', background: 'var(--color-superficie)' }}
+        >
+          {perfilAtivo.alergia && (
+            <p>
+              <strong>⚠️ Alergias:</strong> {perfilAtivo.alergia}
+            </p>
+          )}
+          {perfilAtivo.acessibilidade && (
+            <p>
+              <strong>♿ Necessidades de acessibilidade:</strong> {perfilAtivo.acessibilidade}
+            </p>
+          )}
+        </div>
+      )}
 
       {ficha.perfilId && (
         <button

@@ -10,6 +10,7 @@ import { chaveDaFoto } from '../dados/arquivos';
 import { baixarFotoDoMembroSeFaltar } from '../dados/arquivosNuvem';
 import {
   cancelarConvite,
+  idadeDoMembro,
   listarEquipe,
   mudarPapel,
   removerMembro,
@@ -693,7 +694,8 @@ function Cabecalho({
       <div data-entra>
         <h2 className="text-2xl font-extrabold sm:text-3xl">Equipe</h2>
         <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-          {ministerio} · quem está aqui enxerga nome, idade, laudo e foto das crianças.
+          {ministerio} · quem está aqui enxerga nome, idade, laudo, alergias, necessidades e foto
+          das crianças.
         </p>
       </div>
 
@@ -848,6 +850,11 @@ function LinhaDeMembro({
   const pulso = useRef<HTMLSpanElement>(null);
   const podeEditar = souCoordenador && !membro.souEu;
   const cor = corDoAvatar(membro.usuarioId);
+  // O que a pessoa informou de si: vazio não ocupa linha — tem gente que
+  // preenche só o nome, e a linha de metadados já é longa com o e-mail.
+  const sobre = [membro.profissao, idadeDoMembro(membro.nascimento)]
+    .filter(Boolean)
+    .join(' · ');
 
   useEffect(() => {
     if (!pulsar || semMovimento || !pulso.current) return;
@@ -916,6 +923,7 @@ function LinhaDeMembro({
               ("desd e 04/02/2026") em tela estreita. */}
           <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
             <span className="break-all">{membro.email}</span>
+            {sobre && <span className="whitespace-nowrap"> · {sobre}</span>}
             <span className="whitespace-nowrap"> · desde {formatarData(membro.desde)}</span>
             {ultimoAcesso !== undefined && (
               <span className="whitespace-nowrap">

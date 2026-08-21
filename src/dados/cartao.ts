@@ -8,9 +8,10 @@ import type { EstadoDaRotina } from './rotina';
  *
  * Só usa campo de escolha fechada e o que é claramente pensado para
  * compartilhar (`interesses`, "o que prendeu a atenção"). Fica de fora de
- * propósito: `laudo`, `manejo` (estratégias da equipe, não do pai) e
- * `descricao`/`observacoes` (texto livre sem filtro) — o cartão é para
- * informar, não é a ficha inteira exportada.
+ * propósito: `laudo` e `alergia`/`acessibilidade` do cadastro (dado de
+ * saúde, mesmo critério do laudo), `manejo` (estratégias da equipe, não do
+ * pai) e `descricao`/`observacoes` (texto livre sem filtro) — o cartão é
+ * para informar, não é a ficha inteira exportada.
  *
  * Nunca sai do aparelho sozinho: quem gera decide se compartilha, com quem, e
  * revê o texto antes — é texto puro, para `navigator.share` ou recortar/colar,

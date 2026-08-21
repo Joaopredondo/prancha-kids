@@ -193,6 +193,22 @@ export function SeletorDeCrianca({
               />
             </div>
           </div>
+          {/* Do cadastro, não da ficha: alergia e necessidade valem todo culto
+              e a ficha avisa sozinha enquanto estiverem preenchidas. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo
+              rotulo="Alergias"
+              valor={emEdicao.alergia}
+              aoMudar={(v) => setEmEdicao({ ...emEdicao, alergia: v })}
+              dica="Amendoim, lactose, picada de inseto…"
+            />
+            <Campo
+              rotulo="Necessidades de acessibilidade"
+              valor={emEdicao.acessibilidade}
+              aoMudar={(v) => setEmEdicao({ ...emEdicao, acessibilidade: v })}
+              dica="apoio para andar, baixa visão…"
+            />
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <button

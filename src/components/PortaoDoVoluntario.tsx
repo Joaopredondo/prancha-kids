@@ -224,7 +224,8 @@ export function PortaoDoVoluntario({ aoLiberar, aoFechar }: Props) {
           <div>
             <h2 className="text-2xl font-extrabold">Área do voluntário</h2>
             <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-              Aqui ficam nome, idade, laudo e foto das crianças.
+              Aqui ficam nome, idade, laudo, alergias, necessidades de acessibilidade e foto das
+              crianças.
             </p>
           </div>
 

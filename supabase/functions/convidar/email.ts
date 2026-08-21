@@ -253,8 +253,9 @@ export function htmlDoConvite(dados: DadosDoConvite): string {
               <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top: 2px solid ${COR.linha};">
                 <tr>
                   <td style="padding-top: 16px; font-family: ${FONTE}; font-size: 12px; line-height: 1.6; color: ${COR.textoSuave};">
-                    Com esse acesso você passa a ver nome, idade, laudo e foto das crianças atendidas.
-                    São dados de saúde de menores — trate como o ministério trata a ficha de papel.
+                    Com esse acesso você passa a ver nome, idade, laudo, alergias, necessidades e
+                    foto das crianças atendidas. São dados de saúde de menores — trate como o
+                    ministério trata a ficha de papel.
                   </td>
                 </tr>
               </table>
