@@ -390,8 +390,8 @@ function TravaDeAcesso() {
 function CopiaDeSeguranca() {
   const arquivo = useRef<HTMLInputElement>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  // O backup carrega nome, idade, laudo e foto das crianças: exportar sem
-  // passar pelo código seria a porta dos fundos da trava.
+  // O backup carrega nome, idade, laudo, alergias, necessidades e foto das
+  // crianças: exportar sem passar pelo código seria a porta dos fundos da trava.
   const [liberado, setLiberado] = useState(() => estaDestrancado());
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState(false);
@@ -455,7 +455,7 @@ function CopiaDeSeguranca() {
             erro={erro}
           />
           <p className="text-xs" style={{ color: 'var(--color-texto-suave)' }}>
-            O backup leva nome, idade, laudo e foto das crianças.
+            O backup leva nome, idade, laudo, alergias, necessidades e foto das crianças.
           </p>
           {erro && (
             <p className="text-sm font-bold" style={{ color: 'var(--color-urgencia)' }}>

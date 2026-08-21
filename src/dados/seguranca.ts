@@ -2,7 +2,8 @@
  * Trava de 4 dígitos para a área do voluntário.
  *
  * Segurar 3 segundos evita toque acidental da criança, mas não protege nada de
- * um adulto curioso — e ali dentro há nome, idade, laudo e foto de menores.
+ * um adulto curioso — e ali dentro há nome, idade, laudo, alergias e foto de
+ * menores.
  *
  * O que se guarda é o SHA-256 do código, não o código. Isso não resiste a quem
  * tenha o aparelho e paciência para testar 10 mil combinações: é uma tranca de

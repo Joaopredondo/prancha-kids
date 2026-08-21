@@ -694,7 +694,8 @@ function Cabecalho({
       <div data-entra>
         <h2 className="text-2xl font-extrabold sm:text-3xl">Equipe</h2>
         <p className="mt-1 text-sm" style={{ color: 'var(--color-texto-suave)' }}>
-          {ministerio} · quem está aqui enxerga nome, idade, laudo e foto das crianças.
+          {ministerio} · quem está aqui enxerga nome, idade, laudo, alergias, necessidades e foto
+          das crianças.
         </p>
       </div>
 
